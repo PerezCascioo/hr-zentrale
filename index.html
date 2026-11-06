@@ -626,6 +626,8 @@ dialog.wset{width:min(980px,calc(100vw - 32px));height:min(720px,calc(100vh - 40
  .wslist button[aria-pressed="true"]{background:color-mix(in srgb,var(--acc) 22%,transparent)}.wslist button::before{display:none}.wsi{width:24px;height:24px;border-radius:50%}
  .wshead{padding:14px 16px 8px}.wshead h2{font-size:20px}.wsbody{padding:4px 16px 18px}.wcard{padding:14px}}
 /* Abzeichen in den Einstellungen */
+.abznext{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--fg2);padding:4px 10px 4px 8px;border-radius:999px;border:1px dashed color-mix(in srgb,var(--c) 45%,transparent)}
+.abznext svg{width:12px;height:12px;color:var(--c)}.abznext b{color:var(--fg)}
 .abzbar,.abzp{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 4px}.abzbar i,.abzp i{display:block;height:100%;border-radius:inherit;background:var(--acc)}
 .abzp{height:4px;margin:6px 0 2px}.abzp i{background:color-mix(in srgb,var(--c) 70%,#888)}
 .abzh{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
@@ -1089,6 +1091,9 @@ function abzKatalog(kid){const k=kid&&konto(kid),s=(k&&badgeStats()[kid])||{li:0
    ["Prüfungen & Einstellungen",[["check","Prüfer","s","25 Prüfungen erstellt oder bearbeitet",s.pr,25],["check","Prüfungs-Ass","g","100 Prüfungen erstellt oder bearbeitet",s.pr,100],["userplus","Recruiter","s","10 Mitarbeiter eingestellt",s.ein,10]]],
    ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung einer abgeschlossenen Woche",s.top,1,s.top>1?"×"+s.top:""],["coin","Glückspilz","g","Geschenk der Woche als Erster geöffnet",s.gift,1,s.gift>1?"×"+s.gift:""]]],
    ["Treue",[["clock","1 Monat dabei","b","30 Tage in der HR",d,30],["clock","3 Monate dabei","b","91 Tage in der HR",d,91],["clock","6 Monate dabei","s","182 Tage in der HR",d,182],["clock","1 Jahr dabei","g","365 Tage in der HR",d,365]]]]}
+function nextAbz(kid){const U={mega:["LI-Werbung","LI-Werbungen"],check:["Prüfung","Prüfungen"],userplus:["Einstellung","Einstellungen"],clock:["Tag","Tage"]};
+  const c=abzKatalog(kid).flatMap(g=>g[1]).filter(x=>x[5]>1&&x[4]<x[5]&&U[x[0]]).sort((a,b)=>b[4]/b[5]-a[4]/a[5])[0];if(!c)return"";const n=c[5]-c[4];
+  return`<span class="abznext" style="--c:${TIER[c[2]]}" title="${esc(c[3])}">${svg("lock")}Noch <b>${n} ${U[c[0]][n===1?0:1]}</b> bis ${esc(c[1])}</span>`}
 function vAbzSet(){const kid=meId(),k=kid&&konto(kid),kat=abzKatalog(kid),all=kat.flatMap(g=>g[1]),got=k?all.filter(x=>x[4]>=x[5]).length:0;
   const card=([ic,l,t,desc,v,goal,x])=>{const ok=k&&v>=goal,pc=Math.min(100,Math.round((v||0)/goal*100));
     return`<div class="abzc${ok?" on":""}" style="--c:${TIER[t]}"><span class="abzi">${svg(ok?ic:"lock")}</span><div class="abzt"><b>${esc(l)}${ok&&x?` <small>${x}</small>`:""}</b><span>${esc(desc)}</span>
@@ -1103,7 +1108,7 @@ function vUeberblick(){
   const by=[3,2,1,0].map(s=>ks.filter(k=>k.stufe===s).length),n=ks.length||1,vergeben=[1,2,3].filter(i=>konto(w["platz"+i])).length;
   const nd=new Date(),hr=nd.getHours(),fest=nd.getMonth()===11||(nd.getMonth()===0&&nd.getDate()<=6),gr=P.winter&&fest?"Frohe Festtage":hr<11?"Guten Morgen":hr<18?"Guten Tag":"Guten Abend";
   const desc={richtlinien:"Befugnisse vom Trainee bis zur Leitung",kleidung:"Outfits nach Rang und Geschlecht",auszahlungen:"Beträge pro Tätigkeit",werbung:"Lifeinvader-Text zum Kopieren",konten:"Alle HR-Mitarbeiter mit Position",nachweise:"Lifeinvader-Screenshots annehmen",feedback:"Feedback und Vorschläge abgeben",fbeingang:"Feedback der Mitarbeiter lesen",protokoll:"Wer hat was geändert"};
-  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p>${meId()&&konto(meId())?`<div class="mebadges">${badgesOf(meId()).length?`<span class="hint">Deine Abzeichen:</span>${badgeRow(meId())}`:`<span class="hint">Noch keine Abzeichen. Ab 10 LI-Werbungen gibt es dein erstes.</span>`}</div>`:""}</div>
+  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p>${meId()&&konto(meId())?`<div class="mebadges">${badgesOf(meId()).length?`<span class="hint">Deine Abzeichen:</span>${badgeRow(meId())}${nextAbz(meId())}`:`<span class="hint">Noch keine Abzeichen.</span>${nextAbz(meId())}`}</div>`:""}</div>
    <div class="acts">${writable()?`<button class="btn" data-tab="konten">${svg("userplus")}Mitarbeiter hinzufügen</button><button class="btn pri" data-tab="auszahlungen">${svg("coin")}Auszahlung</button>`:""}</div></div>
   <div class="g ov">
     <div class="stack">
