@@ -598,6 +598,35 @@ select.i option:checked{background:var(--acc);color:#fff}
  select.i::picker(select)::-webkit-scrollbar{width:8px}select.i::picker(select)::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:8px}
 }
 #meName{cursor:pointer}#meName:hover{text-decoration:underline;text-underline-offset:3px}
+.abzs{display:inline-flex;flex-wrap:wrap;gap:5px;vertical-align:middle}
+.abz{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.01em;white-space:nowrap;color:var(--c);
+  background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 38%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.abz svg{width:11px;height:11px}
+.mebadges{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mebadges .abz{font-size:11.5px;padding:4px 10px 4px 8px}.mebadges .abz svg{width:13px;height:13px}
+/* Polizei-Nacht */
+.th-police{background:linear-gradient(180deg,#03040c 0%,#070a1c 55%,#0b0d1e 100%)}
+.th-police .pl{position:absolute;top:-22vh;width:70vw;height:70vh;border-radius:50%;filter:blur(70px);opacity:0;mix-blend-mode:screen}
+.th-police .pl-b{left:-18vw;background:radial-gradient(circle,rgba(40,110,255,.9),transparent 65%);animation:plB 1.6s infinite}
+.th-police .pl-r{right:-18vw;background:radial-gradient(circle,rgba(255,30,60,.85),transparent 65%);animation:plR 1.6s infinite}
+.th-police .pl-b2{left:20vw;top:auto;bottom:-30vh;width:50vw;background:radial-gradient(circle,rgba(40,110,255,.55),transparent 65%);animation:plR 1.6s infinite}
+.th-police .pl-r2{right:18vw;top:auto;bottom:-30vh;width:50vw;background:radial-gradient(circle,rgba(255,30,60,.5),transparent 65%);animation:plB 1.6s infinite}
+@keyframes plB{0%,8%,16%,24%{opacity:.85}4%,12%,20%,28%,100%{opacity:.08}}
+@keyframes plR{0%,48%{opacity:.08}50%,58%,66%,74%{opacity:.8}54%,62%,70%,78%,100%{opacity:.08}}
+.th-police .sweep{position:absolute;left:50%;top:-40vh;width:24vw;height:140vh;transform-origin:50% 100%;background:linear-gradient(180deg,rgba(120,160,255,.10),transparent 70%);filter:blur(10px);animation:sweep 6s ease-in-out infinite alternate}
+@keyframes sweep{from{rotate:-28deg}to{rotate:28deg}}
+.th-police-fg .sky-city{filter:brightness(.55) saturate(.6) hue-rotate(200deg)}
+/* Regen */
+.th-rain{background:linear-gradient(180deg,#0b1018 0%,#101823 45%,#141b26 75%,#0c1118 100%)}
+.th-rain .bk{position:absolute;width:var(--s);height:var(--s);border-radius:50%;background:radial-gradient(circle,var(--c),transparent 70%);opacity:.38;filter:blur(3px);animation:bk 7s ease-in-out infinite alternate}
+@keyframes bk{from{opacity:.18;transform:scale(.85)}to{opacity:.45;transform:scale(1.08)}}
+.th-rain .flash{position:absolute;inset:0;background:rgba(210,225,255,.0);animation:flash 14s infinite}
+@keyframes flash{0%,93%,100%{background:rgba(210,225,255,0)}94%{background:rgba(210,225,255,.16)}95%{background:rgba(210,225,255,0)}96.5%{background:rgba(210,225,255,.1)}97.5%{background:rgba(210,225,255,0)}}
+.th-rain-fg .sky-city{filter:brightness(.6) saturate(.7) blur(1.2px)}
+.th-rain-fg .drops{position:absolute;inset:0;transform:rotate(9deg) scale(1.2)}
+.th-rain-fg .drops i{position:absolute;top:-80px;width:1px;height:var(--h);background:linear-gradient(180deg,transparent,rgba(190,215,255,.55));animation:drop var(--t) linear var(--d) infinite}
+@keyframes drop{to{transform:translateY(115vh)}}
+.pv-police{background:radial-gradient(circle at 15% 10%,rgba(40,110,255,.8),transparent 45%),radial-gradient(circle at 85% 10%,rgba(255,30,60,.75),transparent 45%),linear-gradient(180deg,transparent 62%,#05030b 62%),#070a1c}
+.pv-rain{background:repeating-linear-gradient(100deg,rgba(190,215,255,.18) 0 1px,transparent 1px 9px),radial-gradient(circle at 30% 75%,rgba(255,179,71,.5),transparent 12%),radial-gradient(circle at 70% 70%,rgba(91,180,255,.45),transparent 12%),linear-gradient(180deg,#0b1018,#141b26)}
 </style>
 </head><body>
 
@@ -986,12 +1015,35 @@ let sleighT=null;function sleighLoop(){clearTimeout(sleighT);const el=document.g
   const go=()=>{if(!P.winter||P.mode==="p"||document.hidden){sleighT=setTimeout(go,15000);return}el.classList.remove("go");void el.offsetWidth;el.style.top=(6+Math.random()*22)+"vh";el.style.setProperty("--fd",(20+Math.random()*8)+"s");el.classList.add("go");sleighT=setTimeout(go,45000+Math.random()*40000)};
   sleighT=setTimeout(go,4000)}
 setTimeout(sleighLoop,500);
+/* ---------- Abzeichen ---------- */
+const TIER={b:"#d99a62",s:"#cfd8e6",g:"#f4c95d",x:"var(--acc)"};
+let BADGE_C={k:"",m:{}};
+function badgeStats(){const key=[S.nachweise.length,S.wochen.length,(S.geschenke||[]).length,S.konten.length,Object.keys(S.pruefung||{}).length].join("|");if(BADGE_C.k===key)return BADGE_C.m;
+  const m={};const g=kid=>m[kid]||(m[kid]={li:0,pr:0,ein:0,top:0,gift:0});
+  for(const n of S.nachweise)if(statusOf(n)==="angenommen")g(n.kontoId).li++;
+  const now=Date.now();
+  for(const w of S.wochen){(w.eintraege||[]).forEach(e=>{const o=g(e.kontoId);o.pr+=(+e.erstellt||0)+(+e.bearbeitet||0);o.ein+=+e.eingestellt||0});
+    if(w.eintraege&&w.bis&&w.bis<now){const wk={id:w.id,von:w.von,bis:w.bis},t=tarife(w);const rs=weekRows(w,wk).map(r=>({k:r.kontoId,s:sumRow(r,t)-(+r.bonus||0)})).filter(r=>r.s>0).sort((a,b)=>b.s-a.s);if(rs[0])g(rs[0].k).top++}}
+  for(const x of S.geschenke||[])g(x.kontoId).gift++;
+  BADGE_C={k:key,m};return m}
+function badgesOf(kid){const k=konto(kid);if(!k)return[];const s=badgeStats()[kid]||{li:0,pr:0,ein:0,top:0,gift:0},out=[];
+  if(s.top)out.push(["star",`Wochensieger${s.top>1?" ×"+s.top:""}`,"g",`${s.top}× die höchste Auszahlung einer Woche`]);
+  if(s.li>=100)out.push(["mega","LI-Legende","g",`${s.li} Lifeinvader-Werbungen`]);else if(s.li>=50)out.push(["mega","Werbeprofi","s",`${s.li} Lifeinvader-Werbungen (ab 100: LI-Legende)`]);else if(s.li>=10)out.push(["mega","Werber","b",`${s.li} Lifeinvader-Werbungen (ab 50: Werbeprofi)`]);
+  if(s.pr>=100)out.push(["check","Prüfungs-Ass","g",`${s.pr} Prüfungen erstellt oder bearbeitet`]);else if(s.pr>=25)out.push(["check","Prüfer","s",`${s.pr} Prüfungen erstellt oder bearbeitet (ab 100: Prüfungs-Ass)`]);
+  if(s.ein>=10)out.push(["userplus","Recruiter","s",`${s.ein} Mitarbeiter eingestellt`]);
+  if(s.gift)out.push(["coin",`Glückspilz${s.gift>1?" ×"+s.gift:""}`,"g",`${s.gift}× das Geschenk der Woche gewonnen`]);
+  const d=k.angelegt?(Date.now()-k.angelegt)/864e5:0;
+  if(d>=365)out.push(["clock","1 Jahr dabei","g","Seit über einem Jahr in der HR"]);else if(d>=182)out.push(["clock","6 Monate dabei","s","Seit über 6 Monaten in der HR"]);else if(d>=91)out.push(["clock","3 Monate dabei","b","Seit über 3 Monaten in der HR"]);else if(d>=30)out.push(["clock","1 Monat dabei","b","Seit über einem Monat in der HR"]);
+  return out}
+const badgeChip=([ic,l,t,tip])=>`<span class="abz" style="--c:${TIER[t]}" title="${esc(tip)}">${svg(ic)}${esc(l)}</span>`;
+function badgeRow(kid,max){const b=badgesOf(kid);if(!b.length)return"";const sh=max?b.slice(0,max):b,rest=b.length-sh.length;
+  return`<span class="abzs">${sh.map(badgeChip).join("")}${rest>0?`<span class="abz" style="--c:var(--muted)" title="${esc(b.slice(max).map(x=>x[1]).join(", "))}">+${rest}</span>`:""}</span>`}
 function vUeberblick(){
   const ks=S.konten,besetzt=S.plaetze.filter(p=>konto(p.kontoId)).length,tot=S.plaetze.length||1,wk=weekOf(),w=S.wochen.find(x=>x.id===wk.id)||{},pr=S.content?.praemien||[0,0,0];
   const by=[3,2,1,0].map(s=>ks.filter(k=>k.stufe===s).length),n=ks.length||1,vergeben=[1,2,3].filter(i=>konto(w["platz"+i])).length;
   const nd=new Date(),hr=nd.getHours(),fest=nd.getMonth()===11||(nd.getMonth()===0&&nd.getDate()<=6),gr=P.winter&&fest?"Frohe Festtage":hr<11?"Guten Morgen":hr<18?"Guten Tag":"Guten Abend";
   const desc={richtlinien:"Befugnisse vom Trainee bis zur Leitung",kleidung:"Outfits nach Rang und Geschlecht",auszahlungen:"Beträge pro Tätigkeit",werbung:"Lifeinvader-Text zum Kopieren",konten:"Alle HR-Mitarbeiter mit Position",nachweise:"Lifeinvader-Screenshots annehmen",feedback:"Feedback und Vorschläge abgeben",fbeingang:"Feedback der Mitarbeiter lesen",protokoll:"Wer hat was geändert"};
-  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p></div>
+  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p>${meId()&&konto(meId())?`<div class="mebadges">${badgesOf(meId()).length?`<span class="hint">Deine Abzeichen:</span>${badgeRow(meId())}`:`<span class="hint">Noch keine Abzeichen. Ab 10 LI-Werbungen gibt es dein erstes.</span>`}</div>`:""}</div>
    <div class="acts">${writable()?`<button class="btn" data-tab="konten">${svg("userplus")}Mitarbeiter hinzufügen</button><button class="btn pri" data-tab="auszahlungen">${svg("coin")}Auszahlung</button>`:""}</div></div>
   <div class="g ov">
     <div class="stack">
@@ -1409,7 +1461,7 @@ function vKonten(){
   ${ks.length?`<div class="tbox"><table style="min-width:560px"><thead><tr>${W?"<th></th>":""}<th>Name</th><th>Position</th><th>Seit</th>${W?"<th>Reisepass</th><th>Aktionen</th>":""}</tr></thead><tbody>
   ${ks.map(k=>{const p=String(k.pass||""),sh=UI.showPass[k.id],ren=UI.rename===k.id,ix=all.indexOf(k);return`<tr>
    ${W?`<td style="width:64px"><span class="tact" style="gap:2px"><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-i="-1" aria-label="Nach oben"${ix===0?" disabled":""}>▲</button><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-i="1" aria-label="Nach unten"${ix===all.length-1?" disabled":""}>▼</button></span></td>`:""}
-   <td>${ren?`<input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name">`:`<span class="who"><span class="av">${initials(k.name)}</span>${esc(k.name)}</span>`}</td>
+   <td>${ren?`<input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name">`:`<span class="who"><span class="av">${initials(k.name)}</span><span style="display:flex;flex-direction:column;gap:4px">${esc(k.name)}${badgeRow(k.id,3)}</span></span>`}</td>
    <td>${ren?`<span class="tact"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:220px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label></span>`:`${k.position?esc(k.position):`<span class="hint">–</span>`}${k.leitung?' <span class="badge" style="color:var(--l2)">Leitung</span>':""}`}</td>
    <td class="num">${fmtDate(k.angelegt)}</td>
    ${W?`<td>${ren?`<input class="i mono" id="rp-${k.id}" value="${esc(p)}" inputmode="numeric" style="width:120px;padding:6px 10px" aria-label="Reisepassnummer">`:p?`<span class="tact"><span class="mono">${sh?esc(p):"••••"+esc(p.slice(-4))}</span><button class="btn sm ghost" data-act="pass" data-id="${k.id}">${sh?"Verbergen":"Anzeigen"}</button></span>`:`<span class="hint">–</span>`}</td>
@@ -1571,7 +1623,7 @@ function applyP(){const r=document.documentElement.style;r.setProperty("--acc",v
   document.body.classList.toggle("perf",P.mode==="p");document.body.classList.toggle("winter",!!P.winter);if(P.winter&&!$("#lights").children.length){const C=["#ff4d5e","#ffd34d","#4de08a","#5bb4ff","#ff8a3d"];$("#lights").innerHTML=Array.from({length:Math.ceil(innerWidth/38)},(_,i)=>`<i style="--c:${C[i%5]};--d:${(i*.37%1.6).toFixed(2)}s"></i>`).join("")}$("#stars").hidden=!starsOn()&&!P.winter;renderScene();drawStars();
   const pic=P.pic?`<img src="${esc(imgSrc(P.pic))}" alt="">`:initials(UI.me||"·");$("#meAv").innerHTML=pic;$("#ppAv").innerHTML=pic}
 /* ---------- Stile ---------- */
-const THEMES_BG=[["space","Weltraum","Planeten, Nebel, Sterne"],["aurora","Nordlicht","Polarlichter über Bergen"],["city","Los Santos","Skyline bei Sonnenuntergang"],["synth","Retro","Neon-Sonne und Gitter"],["ocean","Tiefsee","Lichtstrahlen und Blasen"],["minimal","Schlicht","Ruhig, ohne Effekte"],["custom","Eigenes Bild","Dein eigener Hintergrund"]];
+const THEMES_BG=[["space","Weltraum","Planeten, Nebel, Sterne"],["aurora","Nordlicht","Polarlichter über Bergen"],["city","Los Santos","Skyline bei Sonnenuntergang"],["synth","Retro","Neon-Sonne und Gitter"],["ocean","Tiefsee","Lichtstrahlen und Blasen"],["police","Polizei-Nacht","Blaulicht über der Stadt"],["rain","Regen","Nasse Stadt bei Nacht"],["minimal","Schlicht","Ruhig, ohne Effekte"],["custom","Eigenes Bild","Dein eigener Hintergrund"]];
 const themeOf=()=>P.theme||(P.stars===false?"minimal":"space");
 const starsOn=()=>["space","aurora","city","synth"].includes(themeOf());
 const getBgImg=()=>{try{return localStorage.getItem("hrz-bgimg")||""}catch{return""}};
@@ -1583,6 +1635,9 @@ function renderScene(){const t=themeOf(),sky=$("#sceneSky"),fg=$("#sceneFg");if(
   if(t==="synth"){sky.className="th-synth";sky.innerHTML=`<div class="ssun"></div>`;fg.className="th-synth-fg";fg.innerHTML=`<svg class="smtn" viewBox="0 0 1600 200" preserveAspectRatio="none"><path d="M0 200L180 90 300 150 470 40 640 160 800 70 960 160 1120 50 1290 150 1420 80 1600 170V200z" fill="#2a0a4a" stroke="#ff5ad1" stroke-width="2" stroke-opacity=".6"/></svg><div class="grid"></div>`}
   if(t==="ocean"){sky.className="th-ocean";sky.innerHTML=[8,24,41,58,77,90].map((l,i)=>`<i class="ray" style="left:${l}vw;animation-delay:-${i*1.7}s;opacity:${.5+((i*37)%5)/10}"></i>`).join("");
     fg.className="th-ocean-fg";fg.innerHTML=Array.from({length:22},(_,i)=>`<i style="left:${(i*47)%100}vw;--s:${4+(i*7)%12}px;--t:${9+(i*5)%9}s;--d:-${(i*1.3)%12}s"></i>`).join("")}
+  if(t==="police"){sky.className="th-police";sky.innerHTML=`<i class="pl pl-b"></i><i class="pl pl-r"></i><i class="pl pl-b2"></i><i class="pl pl-r2"></i><i class="sweep"></i>`;fg.className="th-police-fg";fg.innerHTML=$("#tplCity").innerHTML}
+  if(t==="rain"){sky.className="th-rain";sky.innerHTML=Array.from({length:26},(_,i)=>`<i class="bk" style="left:${(i*37+11)%100}vw;top:${40+(i*23)%55}vh;--s:${18+(i*13)%46}px;--c:${["#ffb347","#ff6b6b","#5bb4ff","#ffd27a","#9b8cff","#4de0b0"][i%6]};animation-delay:-${i*.7}s"></i>`).join("")+`<i class="flash"></i>`;
+    fg.className="th-rain-fg";fg.innerHTML=$("#tplCity").innerHTML+`<div class="drops">${Array.from({length:110},(_,i)=>`<i style="left:${(i*53)%100}vw;--h:${40+(i*17)%70}px;--t:${.45+((i*7)%10)/18}s;--d:-${((i*13)%20)/10}s;opacity:${.25+((i*11)%10)/22}"></i>`).join("")}</div>`}
   if(t==="custom"){const im=getBgImg();sky.className="th-custom";sky.innerHTML=im?`<div class="cimg" style="background-image:url('${im}')"></div><div class="cdim"></div>`:"";applyCustomVars()}}
 function applyCustomVars(){const s=$("#sceneSky");if(!s)return;s.style.setProperty("--dim",((P.bgDim??45)/100).toFixed(2));s.style.setProperty("--b",(P.bgBlur??0)+"px")}
 async function setBgImg(file){const url=URL.createObjectURL(file);try{const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});
