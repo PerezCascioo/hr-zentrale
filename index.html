@@ -603,6 +603,28 @@ select.i option:checked{background:var(--acc);color:#fff}
   background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 38%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
 .abz svg{width:11px;height:11px}
 .mebadges{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mebadges .abz{font-size:11.5px;padding:4px 10px 4px 8px}.mebadges .abz svg{width:13px;height:13px}
+/* Einstellungen im Windows-Stil */
+dialog.wset{width:min(980px,calc(100vw - 32px));height:min(720px,calc(100vh - 40px));overflow:hidden}
+.ws{display:grid;grid-template-columns:250px 1fr;height:100%;min-height:0}
+.wsnav{padding:20px 12px;border-right:1px solid var(--gline,var(--line));background:rgba(255,255,255,.025);display:flex;flex-direction:column;gap:16px;overflow:auto}
+.wsme{display:flex;gap:11px;align-items:center;padding:8px 10px}.wsme>div{min-width:0;display:flex;flex-direction:column}.wsme b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wsme span:not(.av){font-size:11.5px;color:var(--muted)}
+.wslist{display:flex;flex-direction:column;gap:2px}
+.wslist button{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--fg2);text-align:left;position:relative;background:none;border:0}
+.wslist button:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.wslist button[aria-pressed="true"]{background:rgba(255,255,255,.08);color:var(--fg)}
+.wslist button[aria-pressed="true"]::before{content:"";position:absolute;left:0;top:50%;width:3px;height:16px;margin-top:-8px;border-radius:3px;background:var(--acc)}
+.wsi{width:28px;height:28px;flex:none;border-radius:8px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}.wsi svg{width:15px;height:15px}
+.wsmain{display:flex;flex-direction:column;min-width:0;min-height:0}
+.wshead{display:flex;gap:12px;align-items:flex-start;padding:22px 26px 14px}.wshead>div{flex:1}.wshead h2{font-size:24px;font-weight:800}.wshead p{color:var(--fg2);margin:4px 0 0;font-size:13px}
+.wsbody{padding:4px 26px 26px;overflow:auto;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
+#setBody{display:flex;flex-direction:column;gap:12px}#setBody[hidden]{display:none}
+.wcard{padding:18px;border-radius:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:12px}
+.wcard[hidden]{display:none}.wcard h3{font-size:14.5px}.wcard>p{margin:-6px 0 0;color:var(--fg2);font-size:12.5px}
+@media (max-width:720px){.ws{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+ .wsnav{border-right:0;border-bottom:1px solid var(--gline,var(--line));padding:12px 12px 10px;gap:8px}.wsme{display:none}
+ .wslist{flex-direction:row;overflow-x:auto;scrollbar-width:none;gap:6px}.wslist button{flex:none;padding:7px 11px 7px 7px;font-size:12.5px;border-radius:999px;background:rgba(255,255,255,.04)}
+ .wslist button[aria-pressed="true"]{background:color-mix(in srgb,var(--acc) 22%,transparent)}.wslist button::before{display:none}.wsi{width:24px;height:24px;border-radius:50%}
+ .wshead{padding:14px 16px 8px}.wshead h2{font-size:20px}.wsbody{padding:4px 16px 18px}.wcard{padding:14px}}
 /* Abzeichen in den Einstellungen */
 .abzbar,.abzp{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 4px}.abzbar i,.abzp i{display:block;height:100%;border-radius:inherit;background:var(--acc)}
 .abzp{height:4px;margin:6px 0 2px}.abzp i{background:color-mix(in srgb,var(--c) 70%,#888)}
@@ -684,19 +706,33 @@ select.i option:checked{background:var(--acc);color:#fff}
   </main>
 </div>
 
-<dialog id="settings" aria-labelledby="setT">
-  <div class="dlg">
-    <header><div><div class="eyebrow">Dein Konto</div><h2 id="setT">Einstellungen</h2><p>Farben, Bewegung und Profilbild. Gilt nur für dich.</p></div><button class="ibtn" data-close aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
-    <div class="seg" id="setTabs"><button data-st="acc" aria-pressed="true">Akzentfarbe</button><button data-st="bg" aria-pressed="false">Hintergrund</button><button data-st="stars" aria-pressed="false">Stil</button><button data-st="abz" aria-pressed="false">Abzeichen</button></div>
-    <div id="setBody"></div>
-    <div class="dsec" id="aiSec" hidden></div>
-    <div class="dsec" id="winterSec"></div>
-    <div class="dsec"><h3>Bewegungsmodus</h3><p>Qualität zeigt alle Effekte. Performance schaltet Animationen und Unschärfe ab.</p>
-      <div class="modes" id="modes"></div><span class="status" id="syncTxt"></span></div>
-    <div class="dsec"><h3>Profilbild</h3>
-      <div class="pp"><span class="av lg" id="ppAv">·</span><div class="stack" style="gap:8px;flex:1;min-width:200px">
-        <div class="row" style="gap:8px"><label class="btn" for="ppFile">Bild auswählen</label><input type="file" id="ppFile" accept="image/png,image/jpeg,image/webp" hidden><button class="btn ghost" id="ppDel">Entfernen</button></div>
-        <span class="hint" id="ppHint">PNG, JPG oder WebP, höchstens 3 MB.</span></div></div></div>
+<dialog id="settings" class="wset" aria-labelledby="setT">
+  <div class="ws">
+    <nav class="wsnav">
+      <div class="wsme"><span class="av" id="wsAv">·</span><div><b id="wsName">Gast</b><span id="wsSub">Einstellungen gelten nur für dich</span></div></div>
+      <div class="wslist" id="setTabs">
+        <button data-st="farben"><span class="wsi" style="--c:#e0479e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.7-1.4-.7-2.3 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg></span>Farben</button>
+        <button data-st="stars"><span class="wsi" style="--c:#4c8dff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></span>Stil</button>
+        <button data-st="anzeige"><span class="wsi" style="--c:#3fbf72"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4M3 18a9 9 0 1 1 18 0"/></svg></span>Anzeige &amp; Bewegung</button>
+        <button data-st="profil"><span class="wsi" style="--c:#9b6bff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Profil</button>
+        <button data-st="abz"><span class="wsi" style="--c:#e3b23c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span>Abzeichen</button>
+        <button data-st="leitung" id="wsLeit"><span class="wsi" style="--c:#f08a3c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>Leitung</button>
+      </div>
+    </nav>
+    <div class="wsmain">
+      <header class="wshead"><div><div class="eyebrow" id="setCrumb">Einstellungen</div><h2 id="setT">Farben</h2><p id="setD"></p></div><button class="ibtn" data-close aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+      <div class="wsbody">
+        <div id="setBody" data-cat="farben stars abz"></div>
+        <div class="wcard" data-cat="anzeige"><h3>Bewegungsmodus</h3><p>Qualität zeigt alle Effekte. Performance schaltet Animationen und Unschärfe ab.</p><div class="modes" id="modes"></div><span class="status" id="syncTxt"></span></div>
+        <div class="wcard" data-cat="anzeige" id="winterSec"></div>
+        <div class="wcard" data-cat="profil"><h3>Profilbild</h3>
+          <div class="pp"><span class="av lg" id="ppAv">·</span><div class="stack" style="gap:8px;flex:1;min-width:200px">
+          <div class="row" style="gap:8px"><label class="btn" for="ppFile">Bild auswählen</label><input type="file" id="ppFile" accept="image/png,image/jpeg,image/webp" hidden><button class="btn ghost" id="ppDel">Entfernen</button></div>
+          <span class="hint" id="ppHint">PNG, JPG oder WebP, höchstens 3 MB.</span></div></div></div>
+        <div class="wcard" data-cat="profil"><h3>Wer bist du?</h3><p id="wsWho"></p><div class="row"><button class="btn" data-wsme>Profil wechseln</button></div></div>
+        <div class="wcard" data-cat="leitung" id="aiSec" hidden></div>
+      </div>
+    </div>
   </div>
 </dialog>
 <dialog id="loginDlg" aria-labelledby="loginT"><div class="dlg" id="loginBody"></div></dialog>
@@ -895,7 +931,7 @@ const MEDAL=["#f2c94c","#cfd6e0","#d08b52"];
 
 let db=null,user=null,assets=null,uid=null,canWrite=true,live=false;
 const S={content:null,konten:[],plaetze:[],wochen:[],log:[],nachweise:[],pruefung:{},feedback:[],geschenke:[]};window.S=S;
-const UI={tab:"ueberblick",edit:{},openSlot:null,showPass:{},confirmDel:null,q:"",lv:"all",st:"acc"};
+const UI={tab:"ueberblick",edit:{},openSlot:null,showPass:{},confirmDel:null,q:"",lv:"all",st:"farben"};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtDate=t=>t?new Date(t).toLocaleDateString("de-CH",{day:"2-digit",month:"2-digit",year:"numeric"}):"–";
@@ -1057,7 +1093,7 @@ function vAbzSet(){const kid=meId(),k=kid&&konto(kid),kat=abzKatalog(kid),all=ka
   const card=([ic,l,t,desc,v,goal,x])=>{const ok=k&&v>=goal,pc=Math.min(100,Math.round((v||0)/goal*100));
     return`<div class="abzc${ok?" on":""}" style="--c:${TIER[t]}"><span class="abzi">${svg(ok?ic:"lock")}</span><div class="abzt"><b>${esc(l)}${ok&&x?` <small>${x}</small>`:""}</b><span>${esc(desc)}</span>
       ${ok?`<em>Freigeschaltet</em>`:k?`<div class="abzp"><i style="width:${pc}%"></i></div><em>${goal===1?"Noch nicht erreicht":`${Math.min(v,goal)} / ${goal}`}</em>`:`<em>Gesperrt</em>`}</div></div>`};
-  return`<div class="dsec" style="border:0;padding:0"><h3>Abzeichen</h3><p>${k?`${esc(k.name)}: <b>${got} von ${all.length}</b> freigeschaltet. Sie kommen automatisch, du musst nichts eintragen.`:"Wähle oben links dein Profil, dann siehst du deinen Fortschritt."}</p>
+  return`<div class="wcard"><h3>Fortschritt</h3><p>${k?`${esc(k.name)}: <b>${got} von ${all.length}</b> freigeschaltet. Sie kommen automatisch, du musst nichts eintragen.`:"Wähle oben links dein Profil, dann siehst du deinen Fortschritt."}</p>
     <div class="abzbar"><i style="width:${Math.round(got/all.length*100)}%"></i></div>
     ${kat.map(([h,xs])=>`<div class="abzh">${h}</div><div class="abzgrid">${xs.map(card).join("")}</div>`).join("")}</div>`}
 function badgeRow(kid,max){const b=badgesOf(kid);if(!b.length)return"";const sh=max?b.slice(0,max):b,rest=b.length-sh.length;
@@ -1674,24 +1710,30 @@ function setP(patch){Object.assign(P,patch);applyP();renderSet();try{localStorag
   clearTimeout(syncT);syncT=setTimeout(async()=>{if(db&&uid){try{await db.doc(`data/users/${uid}/prefs`).set({...P});$("#syncTxt").textContent="Mit deinem Konto synchronisiert."}catch{$("#syncTxt").textContent="Nur in diesem Browser gespeichert."}}},600)}
 function nameOf(list,v){return(list.find(x=>x[1].toLowerCase()===String(v).toLowerCase())||["Eigene Farbe"])[0]}
 function renderSet(){
+  if(UI.st==="acc"||UI.st==="bg")UI.st="farben";if(UI.st==="leitung"&&HR.role<3)UI.st="farben";$("#wsLeit").hidden=HR.role<3;
   document.querySelectorAll("#setTabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.st===UI.st));
+  const CAT={farben:["Farben","Akzentfarbe und Seitenhintergrund."],stars:["Stil","Wie der Hintergrund hinter dem Dashboard aussieht."],anzeige:["Anzeige & Bewegung","Animationen, Leistung und das Winter-Special."],profil:["Profil","Dein Bild und wer du im Dashboard bist."],abz:["Abzeichen","Was du schon freigeschaltet hast und was noch fehlt."],leitung:["Leitung","Sicherung und KI-Auswertung. Nur für die Leitung sichtbar."]};
+  $("#setT").textContent=CAT[UI.st][0];$("#setD").textContent=CAT[UI.st][1];
+  document.querySelectorAll("#settings [data-cat]").forEach(x=>x.hidden=!x.dataset.cat.split(" ").includes(UI.st)||(x.id==="aiSec"&&HR.role<3));
+  {const kid=meId(),k=kid&&konto(kid);$("#wsName").textContent=UI.me||(k&&k.name)||"Gast";$("#wsSub").textContent=HR.uid?"Leitung · angemeldet":k?"Profil gewählt":"Kein Profil gewählt";$("#wsAv").innerHTML=P.pic?`<img src="${esc(imgSrc(P.pic))}" alt="">`:initials(UI.me||(k&&k.name)||"·");
+   $("#wsWho").textContent=HR.uid?`Du bist als Leitung angemeldet${UI.me?" ("+UI.me+")":""}. Zum Wechseln erst abmelden.`:k?`Du bist als ${k.name} unterwegs. Abzeichen und „Deine Abzeichen“ im Überblick richten sich danach.`:"Du bist als Gast unterwegs. Wähle deinen Namen, damit du deine Abzeichen siehst."}
   const b=$("#setBody");
-  if(UI.st==="acc")b.innerHTML=`<div class="dsec" style="border:0;padding:0"><h3>Akzentfarbe</h3><p>Färbt Hervorhebungen, Buttons und aktive Elemente. Der Hintergrund bleibt gleich.</p>
+  if(UI.st==="farben")b.innerHTML=`<div class="wcard"><h3>Akzentfarbe</h3><p>Färbt Hervorhebungen, Buttons und aktive Elemente. Der Hintergrund bleibt gleich.</p>
     <div class="chips">${ACC.map(([n,c])=>`<button class="cchip" data-acc="${c}" aria-pressed="${P.acc.toLowerCase()===c}"><i style="background:${c}"></i>${n}</button>`).join("")}</div>
     <div class="custom"><input type="color" id="accC" value="${P.acc}" aria-label="Eigene Akzentfarbe"><label class="f" for="accH">Hex-Farbcode<input class="i mono" id="accH" value="${P.acc.toUpperCase()}" maxlength="7"></label><button class="btn" data-accdef>Standard</button></div>
     <span class="status">${nameOf(ACC,P.acc)} ist ausgewählt.</span></div>`;
-  if(UI.st==="bg")b.innerHTML=`<div class="dsec" style="border:0;padding:0"><h3>Hintergrundfarbe</h3><p>Ändert nur den Seitenhintergrund. Eigene Farben werden abgedunkelt, damit Texte lesbar bleiben.</p>
+  if(UI.st==="farben")b.innerHTML+=`<div class="wcard"><h3>Hintergrundfarbe</h3><p>Ändert nur den Seitenhintergrund. Eigene Farben werden abgedunkelt, damit Texte lesbar bleiben.</p>
     <div class="chips">${BGS.map(([n,c])=>`<button class="cchip" data-bg="${c}" aria-pressed="${P.bg.toLowerCase()===c}"><i style="background:${BGDOT[n]}"></i>${n}</button>`).join("")}</div>
     <div class="custom"><input type="color" id="bgC" value="${P.bg}" aria-label="Eigene Hintergrundfarbe"><label class="f" for="bgH">Hex-Farbcode<input class="i mono" id="bgH" value="${P.bg.toUpperCase()}" maxlength="7"></label><button class="btn" data-bgdef>Standard</button></div>
     <span class="status">${nameOf(BGS,P.bg)==="Standard"?"Standard-Hintergrund":nameOf(BGS,P.bg)} ist ausgewählt.</span></div>`;
-  if(UI.st==="stars"){const th=themeOf(),im=getBgImg();b.innerHTML=`<div class="dsec" style="border:0;padding:0"><h3>Stil</h3><p>Wähle, wie der Hintergrund aussieht. Gilt nur für dich. Im Modus Performance steht alles still.</p>
+  if(UI.st==="stars"){const th=themeOf(),im=getBgImg();b.innerHTML=`<div class="wcard"><h3>Hintergrund-Stil</h3><p>Im Modus Performance steht alles still.</p>
     <div class="thgrid">${THEMES_BG.map(([id,n,d])=>`<button class="thbtn" data-theme="${id}" aria-pressed="${th===id}"><span class="pv pv-${id}"${id==="custom"&&im?` style="background-image:url('${im}')"`:""}>${id==="custom"&&!im?"+":id==="city"?$("#tplCity").innerHTML.replace('class="sky-city"',''):""}</span><b>${n}</b><small>${d}</small></button>`).join("")}</div>
     ${th==="custom"?`<div class="cust"><b style="font-size:13px">Eigenes Bild</b><span class="hint">Wird nur in diesem Browser gespeichert, andere sehen es nicht.</span>
       <div class="row" style="gap:8px"><label class="btn" for="bgFile" style="cursor:pointer">${svg("image")}${im?"Anderes Bild wählen":"Bild hochladen"}</label><input type="file" id="bgFile" accept="image/*" hidden>${im?`<button class="btn danger" data-bgimgdel>Entfernen</button>`:""}</div>
       <label class="f" for="bgDim">Abdunkeln: <span id="bgDimV">${P.bgDim??45}%</span><input type="range" id="bgDim" min="0" max="85" value="${P.bgDim??45}"></label>
       <label class="f" for="bgBlur">Unschärfe: <span id="bgBlurV">${P.bgBlur??0}px</span><input type="range" id="bgBlur" min="0" max="20" value="${P.bgBlur??0}"></label></div>`:""}</div>`}
   if(UI.st==="abz")b.innerHTML=vAbzSet();
-  const ai=$("#aiSec");ai.hidden=HR.role<3;if(HR.role>=3)ai.innerHTML=`<h3>Sicherung</h3><p>Lädt alle Daten als Datei herunter: Mitarbeiter, Wochen und Auszahlungen, Richtlinien, Nachweise, Feedback und Protokoll. Am besten ab und zu machen.</p><div class="row"><button class="btn" data-backup>${svg("check")}Sicherung herunterladen</button></div><div style="height:8px"></div><h3>Leitungs-Passwort ändern</h3><p>Gilt sofort für alle aus der Leitung.</p><div class="row"><label class="f" for="npw">Neues Passwort<input class="i" id="npw" type="password" autocomplete="new-password"></label><button class="btn" data-pwsave>Passwort ändern</button></div><div style="height:8px"></div><h3>KI für automatische Auswertung (optional, kostenpflichtig)</h3><p>Google-Gemini-Schlüssel aus Google AI Studio. Wird geschützt gespeichert und ist nur für die Leitung nutzbar.</p>
+  const ai=$("#aiSec");if(HR.role>=3)ai.innerHTML=`<h3>Sicherung</h3><p>Lädt alle Daten als Datei herunter: Mitarbeiter, Wochen und Auszahlungen, Richtlinien, Nachweise, Feedback und Protokoll. Am besten ab und zu machen.</p><div class="row"><button class="btn" data-backup>${svg("check")}Sicherung herunterladen</button></div><div style="height:8px"></div><h3>Leitungs-Passwort ändern</h3><p>Gilt sofort für alle aus der Leitung.</p><div class="row"><label class="f" for="npw">Neues Passwort<input class="i" id="npw" type="password" autocomplete="new-password"></label><button class="btn" data-pwsave>Passwort ändern</button></div><div style="height:8px"></div><h3>KI für automatische Auswertung (optional, kostenpflichtig)</h3><p>Google-Gemini-Schlüssel aus Google AI Studio. Wird geschützt gespeichert und ist nur für die Leitung nutzbar.</p>
     <div class="row"><label class="f" for="aiK">API-Schlüssel<input class="i mono" id="aiK" type="password" value="${esc(HR.ai?.key||"")}" autocomplete="off"></label><label class="f" for="aiM" style="flex:0 1 230px">Modell<input class="i mono" id="aiM" value="${esc(HR.ai?.model||"gemini-flash-lite-latest")}"></label><button class="btn pri" data-aisave>Speichern</button></div>
     <span class="status">${HR.ai?.key?"Schlüssel ist hinterlegt. Die automatische Auswertung ist aktiv.":"Noch kein Schlüssel hinterlegt."}</span>`;
   $("#winterSec").innerHTML=`<h3>Winter-Special</h3><p>Schneefall, Eiskristalle, Lichterkette mit Eiszapfen und winterliche Farben auf der ganzen Seite.</p><button class="switch" role="switch" aria-checked="${!!P.winter}" data-winter><span class="tr"></span><span><b>Winter-Special anzeigen</b><span>${P.winter?(P.mode==="p"?"Aktiv, Schnee steht still":"Aktiv, es schneit"):"Ausgeschaltet"}</span></span></button>`;
@@ -1705,6 +1747,7 @@ $("#settings").addEventListener("click",async e=>{
   if(e.target.closest("[data-backup]")){const d=new Date(),p2=x=>String(x).padStart(2,"0"),name=`hr-zentral-sicherung-${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}.json`;
     const data={erstellt:d.toISOString(),von:whoName()||"Leitung",content:S.content,konten:S.konten,wochen:S.wochen,nachweise:S.nachweise,pruefung:S.pruefung,feedback:S.feedback,geschenke:(S.geschenke||[]).map(g=>({...g,zeit:gMs(g.zeit),betrag:giftAmt(g)})),log:S.log};
     const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);toast("Sicherung heruntergeladen");return}
+  if(e.target.closest("[data-wsme]")){$("#settings").close();HR.uid?openWho():openMe();return}
   const st=e.target.closest("[data-st]");if(st){UI.st=st.dataset.st;renderSet();return}
   const ac=e.target.closest("[data-acc]");if(ac){setP({acc:ac.dataset.acc});return}
   if(e.target.closest("[data-accdef]")){setP({acc:DEF.acc});return}
