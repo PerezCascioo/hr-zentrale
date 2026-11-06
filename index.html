@@ -1077,7 +1077,7 @@ function badgeStats(){const key=[S.nachweise.length,S.wochen.length,(S.geschenke
   for(const n of S.nachweise)if(statusOf(n)==="angenommen")g(n.kontoId).li++;
   const now=Date.now();
   for(const w of S.wochen){(w.eintraege||[]).forEach(e=>{const o=g(e.kontoId);o.pr+=(+e.erstellt||0)+(+e.bearbeitet||0);o.ein+=+e.eingestellt||0});
-    if(w.eintraege&&w.bis&&w.bis<now){const wk={id:w.id,von:w.von,bis:w.bis},t=tarife(w);const rs=weekRows(w,wk).map(r=>({k:r.kontoId,s:sumRow(r,t)-(+r.bonus||0)})).filter(r=>r.s>0).sort((a,b)=>b.s-a.s);if(rs[0])g(rs[0].k).top++}}
+    if(w.eintraege&&w.bis&&w.bis<now){const wk={id:w.id,von:w.von,bis:w.bis},t=tarife(w);const rs=weekRows(w,wk).map(r=>({k:r.kontoId,s:baseRow(r,t)})).filter(r=>r.s>0).sort((a,b)=>b.s-a.s);if(rs[0])g(rs[0].k).top++}}
   for(const x of S.geschenke||[])g(x.kontoId).gift++;
   BADGE_C={k:key,m};return m}
 function badgesOf(kid){const k=konto(kid);if(!k)return[];const s=badgeStats()[kid]||{li:0,pr:0,ein:0,top:0,gift:0},out=[];
@@ -1114,8 +1114,8 @@ function nextAbz(kid){const U={mega:["LI-Werbung","LI-Werbungen"],check:["Prüfu
 function vAbzSet(){const kid=meId(),k=kid&&konto(kid),kat=abzKatalog(kid),all=kat.flatMap(g=>g[1]),got=k?all.filter(x=>x[4]>=x[5]).length:0;
   const card=([ic,l,t,desc,v,goal,x])=>{const ok=k&&v>=goal,pc=Math.min(100,Math.round((v||0)/goal*100));
     return`<div class="abzc${ok?" on":""}" style="--c:${TIER[t]}"><span class="abzi">${svg(ok?ic:"lock")}</span><div class="abzt"><b>${esc(l)}${ok&&x?` <small>${x}</small>`:""}</b><span>${esc(desc)}</span>
-      ${abzAmt(t)&&!["Wochensieger","Glückspilz"].includes(l)?`<span class="abzbon">+${money(abzAmt(t))} Bonus</span>`:""}${PERK[l]?`<span class="abzbon">+${PERK[l]} % aufs Geschenk der Woche</span>`:""}${ok?`<em>Freigeschaltet</em>`:k?`<div class="abzp"><i style="width:${pc}%"></i></div><em>${goal===1?"Noch nicht erreicht":`${Math.min(v,goal)} / ${goal}`}</em>`:`<em>Gesperrt</em>`}</div></div>`};
-  return`<div class="wcard"><h3>Fortschritt</h3><p>${k?`${esc(k.name)}: <b>${got} von ${all.length}</b> freigeschaltet. Sie kommen automatisch, du musst nichts eintragen.`:"Wähle oben links dein Profil, dann siehst du deinen Fortschritt."}</p>
+      ${abzAmt(t)&&!["Wochensieger","Glückspilz"].includes(l)?`<span class="abzbon">+${money(abzAmt(t))} Bonus</span>`:""}${PERK[l]?`<span class="abzbon">+${PERK[l]} % aufs Geschenk der Woche</span>`:""}${BOOSTU[l]?`<span class="abzbon" style="color:#9fd9ff">Boost: ${boostLbl(l)}</span>`:""}${ok?`<em>Freigeschaltet</em>`:k?`<div class="abzp"><i style="width:${pc}%"></i></div><em>${goal===1?"Noch nicht erreicht":`${Math.min(v,goal)} / ${goal}`}</em>`:`<em>Gesperrt</em>`}</div></div>`};
+  return`<div class="wcard"><h3>Fortschritt</h3><p>${k?`${esc(k.name)}: <b>${got} von ${all.length}</b> freigeschaltet. Sie kommen automatisch, du musst nichts eintragen.<br>${boostOf(kid,weekOf()).length?`<span style="color:#9fd9ff">Dein Boost diese Woche: <b>${boostOf(kid,weekOf()).map(boostLbl).join(", ")}</b>.</span> `:""}Boost gibt es extra für die Tätigkeit, für die du das Abzeichen hast. Pro Bereich zählt die höchste Stufe, neue Abzeichen zählen ab der nächsten Woche.`:"Wähle oben links dein Profil, dann siehst du deinen Fortschritt."}</p>
     <div class="abzbar"><i style="width:${Math.round(got/all.length*100)}%"></i></div>
     ${kat.map(([h,xs])=>`<div class="abzh">${h}</div><div class="abzgrid">${xs.map(card).join("")}</div>`).join("")}</div>`}
 function badgeRow(kid,max){const b=badgesOf(kid);if(!b.length)return"";const sh=max?b.slice(0,max):b,rest=b.length-sh.length;
@@ -1125,7 +1125,7 @@ function vUeberblick(){
   const by=[3,2,1,0].map(s=>ks.filter(k=>k.stufe===s).length),n=ks.length||1,vergeben=[1,2,3].filter(i=>konto(w["platz"+i])).length;
   const nd=new Date(),hr=nd.getHours(),fest=nd.getMonth()===11||(nd.getMonth()===0&&nd.getDate()<=6),gr=P.winter&&fest?"Frohe Festtage":hr<11?"Guten Morgen":hr<18?"Guten Tag":"Guten Abend";
   const desc={richtlinien:"Befugnisse vom Trainee bis zur Leitung",kleidung:"Outfits nach Rang und Geschlecht",auszahlungen:"Beträge pro Tätigkeit",werbung:"Lifeinvader-Text zum Kopieren",konten:"Alle HR-Mitarbeiter mit Position",nachweise:"Lifeinvader-Screenshots annehmen",feedback:"Feedback und Vorschläge abgeben",fbeingang:"Feedback der Mitarbeiter lesen",protokoll:"Wer hat was geändert"};
-  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p>${meId()&&konto(meId())?`<div class="mebadges">${badgesOf(meId()).length?`<span class="hint">Deine Abzeichen:</span>${badgeRow(meId())}${nextAbz(meId())}`:`<span class="hint">Noch keine Abzeichen.</span>${nextAbz(meId())}`}</div>`:""}</div>
+  return`<div class="crumb">Allgemein <i>/</i> Überblick</div><div class="phead"><div><h1>${gr}${UI.me?", "+esc(UI.me.split(" ")[0]):""}.</h1><p>Stand der HR-Abteilung für die Woche vom ${fmtDate(wk.von)} bis ${fmtDate(wk.bis)}.</p>${meId()&&konto(meId())?`<div class="mebadges">${badgesOf(meId()).length?`<span class="hint">Deine Abzeichen:</span>${badgeRow(meId())}${boostOf(meId(),weekOf()).map(l=>`<span class="abznext" style="--c:#9fd9ff" title="Boost durch ${esc(l)}">${svg("gauge")}<b>${boostLbl(l)}</b></span>`).join("")}${nextAbz(meId())}`:`<span class="hint">Noch keine Abzeichen.</span>${nextAbz(meId())}`}</div>`:""}</div>
    <div class="acts">${writable()?`<button class="btn" data-tab="konten">${svg("userplus")}Mitarbeiter hinzufügen</button><button class="btn pri" data-tab="auszahlungen">${svg("coin")}Auszahlung</button>`:""}</div></div>
   <div class="g ov">
     <div class="stack">
@@ -1182,9 +1182,23 @@ function vKleidung(){
 const TARIF=[["erstellt","Prüfung erstellt","check"],["bearbeitet","Prüfung bearbeitet","edit"],["eingestellt","Mitarbeiter eingestellt","userplus"],["werbung","Lifeinvader-Werbung","mega"]];
 const TDEF={erstellt:2000,bearbeitet:3000,eingestellt:3000,werbung:5000};
 const tarife=w=>({...TDEF,...(S.content?.tarife||{}),...((w&&w.tarife)||{})});
-const sumRow=(r,t)=>TARIF.reduce((s,[k])=>s+(+r[k]||0)*(+t[k]||0),0)+(+r.bonus||0);
+const baseRow=(r,t)=>TARIF.reduce((s,[k])=>s+(+r[k]||0)*(+t[k]||0),0);
+const boostAmt=r=>(r.boost||[]).reduce((s,l)=>s+Object.entries(BOOSTU[l]||{}).reduce((a,[k,v])=>a+(+r[k]||0)*v,0),0);
+const sumRow=(r,t)=>baseRow(r,t)+boostAmt(r,t)+(+r.bonus||0);
 const gMs=z=>typeof z==="number"?z:z&&typeof z.toMillis==="function"?z.toMillis():z&&z.seconds?z.seconds*1000+Math.floor((z.nanoseconds||0)/1e6):0;
-const PERK={"Glückspilz":25,"Werbeprofi":5,"LI-Legende":10,"1 Jahr dabei":10};
+const PERK={"Glückspilz":5};
+const BOOSTU={"Werber":{werbung:250},"Werbeprofi":{werbung:500},"LI-Legende":{werbung:750},"Prüfer":{erstellt:150,bearbeitet:150},"Prüfungs-Ass":{erstellt:300,bearbeitet:300},"Recruiter":{eingestellt:300}};
+const boostLbl=l=>{const u=BOOSTU[l];if(!u)return"";return u.werbung?`+${money(u.werbung)} pro LI-Werbung`:u.erstellt?`+${money(u.erstellt)} pro Prüfung`:`+${money(u.eingestellt)} pro Einstellung`};
+let BOOST_C={k:"",m:{}};
+function boostOf(kid,wk){const k=konto(kid);if(!k||!wk||wk.von<ABZ_START)return[];const key=[S.nachweise.length,S.wochen.length,S.konten.length,Object.keys(S.pruefung||{}).length].join("|");if(BOOST_C.k!==key)BOOST_C={k:key,m:{}};
+  const ck=kid+"@"+wk.id;if(BOOST_C.m[ck])return BOOST_C.m[ck];const T=wk.von,out=[];
+  const li=S.nachweise.filter(n=>n.kontoId===kid&&n.zeit&&n.zeit<T&&statusOf(n)==="angenommen").length;let pr=0,ein=0;
+  S.wochen.forEach(w=>{if(w.von<T)(w.eintraege||[]).forEach(e=>{if(e.kontoId===kid){pr+=(+e.erstellt||0)+(+e.bearbeitet||0);ein+=+e.eingestellt||0}})});
+  const d=k.angelegt?(T-k.angelegt)/864e5:0;
+  if(li>=100)out.push(["LI-Legende","g"]);else if(li>=50)out.push(["Werbeprofi","s"]);else if(li>=10)out.push(["Werber","b"]);
+  if(pr>=100)out.push(["Prüfungs-Ass","g"]);else if(pr>=25)out.push(["Prüfer","s"]);
+  if(ein>=10)out.push(["Recruiter","s"]);
+  return BOOST_C.m[ck]=out.map(([l])=>l)}
 function giftPerks(kid,ms){const k=konto(kid);if(!k||!ms||ms<ABZ_START)return[];const out=[];
   if((S.geschenke||[]).some(x=>x.kontoId===kid&&gMs(x.zeit)&&gMs(x.zeit)<ms&&x.id!==weekOf(new Date(ms)).id))out.push(["Glückspilz",PERK["Glückspilz"]]);
   const li=S.nachweise.filter(n=>n.kontoId===kid&&n.zeit&&n.zeit<ms&&statusOf(n)==="angenommen").length;if(li>=100)out.push(["LI-Legende",PERK["LI-Legende"]]);else if(li>=50)out.push(["Werbeprofi",PERK["Werbeprofi"]]);
@@ -1216,7 +1230,7 @@ function weekRows(w,wk=selWeek()){const dr=UI.draft&&UI.draft.wid===w.id,src=(dr
   const gf=giftOf(wk.id);if(gf&&giftAmt(gf)&&konto(gf.kontoId)&&!aus.has(gf.kontoId)&&!by[gf.kontoId]){const o={name:gf.name,kontoId:gf.kontoId};TARIF.forEach(([k])=>o[k]=0);by[gf.kontoId]=o}
   abzOf&&(abzUnlocks()[wk.id]||[]).forEach(x=>{if(konto(x.kid)&&!aus.has(x.kid)&&!isAushilfe(x.kid)&&!by[x.kid]){const o={name:konto(x.kid).name,kontoId:x.kid};TARIF.forEach(([k])=>o[k]=0);by[x.kid]=o}});
   const base=Object.values(by);
-  base.forEach(r=>{r.name=konto(r.kontoId).name;r.werbungAuto=liOf(r.kontoId,wk).length;r.werbung=r.werbungFix!=null?+r.werbungFix:r.werbungAuto;if(isLeitung(r.kontoId)){r.lead=true;TARIF.forEach(([k])=>{if(k!=="werbung")r[k]=0})}r.gift=gf&&gf.kontoId===r.kontoId?giftAmt(gf):0;r.abz=abzOf(r.kontoId,wk.id);r.bonus=r.gift+r.abz.reduce((s,x)=>s+x.amt,0)});
+  base.forEach(r=>{r.name=konto(r.kontoId).name;r.werbungAuto=liOf(r.kontoId,wk).length;r.werbung=r.werbungFix!=null?+r.werbungFix:r.werbungAuto;if(isLeitung(r.kontoId)){r.lead=true;TARIF.forEach(([k])=>{if(k!=="werbung")r[k]=0})}r.gift=gf&&gf.kontoId===r.kontoId?giftAmt(gf):0;r.abz=abzOf(r.kontoId,wk.id);r.bonus=r.gift+r.abz.reduce((s,x)=>s+x.amt,0);r.boost=boostOf(r.kontoId,wk)});
   return base.filter(r=>!r.lead||r.werbung>0||r.bonus>0||dr)}
 function ensureDraft(){const wk=selWeek(),w=weekDoc(wk.id);if(!UI.draft||UI.draft.wid!==wk.id){const cur=weekRows(w,wk);UI.draft={wid:wk.id,aus:[...(w.aus||[])],rows:[]};UI.draft.rows=JSON.parse(JSON.stringify(cur.map(r=>{const o={name:r.name,kontoId:r.kontoId};TARIF.forEach(([k])=>{if(k!=="werbung")o[k]=+r[k]||0});if(r.werbungFix!=null)o.werbungFix=r.werbungFix;return o})))}return UI.draft}
 
@@ -1227,7 +1241,7 @@ function periodBar(wk){const p=UI.per||"woche",o=UI.wo||0;
 
 /* ---------- Vergleich zur Vorwoche ---------- */
 function weekStats(wk){const w=weekDoc(wk.id),t=tarife(w),rs=weekRows(w,wk),o={geld:0,leute:rs.length,akt:0};TARIF.forEach(([k])=>o[k]=0);
-  rs.forEach(r=>{TARIF.forEach(([k])=>{o[k]+=+r[k]||0;o.akt+=+r[k]||0});o.geld+=sumRow(r,t)-(+r.bonus||0)});return o}
+  rs.forEach(r=>{TARIF.forEach(([k])=>{o[k]+=+r[k]||0;o.akt+=+r[k]||0});o.geld+=baseRow(r,t)});return o}
 function deltaPill(cur,prev,big){const d=prev?Math.round((cur-prev)/prev*100):cur?null:0,up=prev?cur>prev:cur>0,dn=cur<prev,c=d===0&&!up&&!dn?"var(--muted)":up?"var(--l1)":"var(--l3)";
   const txt=d===null?"neu":(d>0?"+":"")+d+" %";return`<span class="num" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex:none;padding:${big?"5px 11px":"2px 8px"};border-radius:999px;font-weight:800;font-size:${big?"14px":"11.5px"};color:${c};background:color-mix(in srgb,${c} 15%,transparent);border:1px solid color-mix(in srgb,${c} 35%,transparent)">${up?"▲":dn?"▼":"●"} ${txt}</span>`}
 function vVergleich(wk){const pw=weekOf(new Date(wk.von-3*864e5)),a=weekStats(wk),b=weekStats(pw),fd=x=>fmtDate(x).slice(0,6);
@@ -1239,7 +1253,7 @@ function vVergleich(wk){const pw=weekOf(new Date(wk.von-3*864e5)),a=weekStats(wk
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${tiles.map(([l,x,y,cur,main])=>`<div style="padding:12px 14px;border-radius:12px;border:1px solid ${main?"color-mix(in srgb,var(--acc) 40%,transparent)":"var(--gline)"};background:${main?"color-mix(in srgb,var(--acc) 10%,transparent)":"color-mix(in srgb,var(--fg) 4%,transparent)"}">
      <div class="hint" style="font-size:11.5px">${l}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:4px;flex-wrap:wrap"><b class="num" style="font-size:19px">${v(x,cur)}</b>${deltaPill(x,y)}</div>
      <div class="hint" style="font-size:11px;margin-top:2px">Vorwoche: ${v(y,cur)}</div></div>`).join("")}</div>
-   <div class="hint" style="font-size:11px;margin-top:10px">Ohne Geschenk und Abzeichen-Bonus gerechnet.</div></div></div>`}
+   <div class="hint" style="font-size:11px;margin-top:10px">Ohne Geschenk, Boost und Abzeichen-Bonus gerechnet.</div></div></div>`}
 function vGiftAdmin(wk){if(!UI.admin)return"";const g=giftOf(wk.id);if(!g)return"";const a=giftAmt(g);
   return`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">Geschenk der Woche: <b>${esc(g.name)}</b> hat ${a?money(a):"…"} gewonnen.</span><button class="btn sm danger" data-act="gift-reset" data-id="${wk.id}">${UI.confirmDel==="gift:"+wk.id?"Wirklich zurücksetzen?":"Geschenk zurücksetzen"}</button></div>`}
 function vAuszahlungen(){
@@ -1268,7 +1282,7 @@ function vAuszahlungen(){
    ${sc.err?`<div class="pad"><div class="note" style="color:var(--l3)">${svg("info")}${esc(sc.err)}</div></div>`:""}
    ${rows.length?`<div class="tbox"><table style="min-width:780px"><thead><tr><th>Mitarbeiter</th>${TARIF.map(([k,l])=>`<th>${l.split(" ")[k==="werbung"?0:1]}<br><span style="text-transform:none;letter-spacing:0;font-weight:600">${money(t[k])}</span></th>`).join("")}<th>Betrag</th><th>Ausgezahlt</th>${W?"<th></th>":""}</tr></thead><tbody>
     ${rows.map(r=>{const k=konto(r.kontoId),p=!!paid[r.kontoId];return`<tr><td><span class="who"><span class="av">${initials(k.name)}</span>${esc(k.name)}</span></td>${TARIF.map(([kk])=>`<td>${cell(r,kk)}</td>`).join("")}
-     <td class="num"><b style="font-size:13.5px">${money(r.summe)}</b>${r.gift?`<div class="hint" style="font-size:11px;color:#e8c46a" title="${esc(perkTxt(r.kontoId,gMs(giftOf(selWeek().id)?.zeit)))}">inkl. Geschenk ${money(r.gift)}</div>`:""}${(r.abz||[]).map(x=>`<div class="hint" style="font-size:11px;color:${TIER[x.t]}">inkl. ${esc(x.l)} ${money(x.amt)}</div>`).join("")}</td>
+     <td class="num"><b style="font-size:13.5px">${money(r.summe)}</b>${r.gift?`<div class="hint" style="font-size:11px;color:#e8c46a" title="${esc(perkTxt(r.kontoId,gMs(giftOf(selWeek().id)?.zeit)))}">inkl. Geschenk ${money(r.gift)}</div>`:""}${boostAmt(r)?`<div class="hint" style="font-size:11px;color:#9fd9ff" title="${esc(r.boost.map(l=>l+": "+boostLbl(l)).join(", "))}">inkl. Abzeichen-Boost ${money(boostAmt(r))}</div>`:""}${(r.abz||[]).map(x=>`<div class="hint" style="font-size:11px;color:${TIER[x.t]}">inkl. ${esc(x.l)} ${money(x.amt)}</div>`).join("")}</td>
      <td>${W?`<button class="btn sm" data-act="paid" data-id="${r.kontoId}" role="checkbox" aria-checked="${p}" aria-label="${esc(k.name)} ausgezahlt" style="gap:8px;${p?"color:var(--l1);border-color:color-mix(in srgb,var(--l1) 45%,transparent);background:color-mix(in srgb,var(--l1) 10%,var(--s2c))":"color:var(--fg2)"}"><span style="width:16px;height:16px;border-radius:4px;display:grid;place-items:center;border:1.5px solid ${p?"var(--l1)":"var(--line2)"};background:${p?"var(--l1)":"transparent"};color:#0d0b12">${p?svg("check",'style="width:11px;height:11px" stroke-width="3.5"'):""}</span>${p?"Ausgezahlt":"Offen"}</button><button class="btn sm ghost" data-act="pay-copy" data-id="${r.kontoId}" data-amt="${r.summe}" title="Auszahlungs-Nachricht kopieren" aria-label="Nachricht kopieren" style="margin-left:4px">${svg("copy")}</button>`:p?`<span class="badge" style="color:var(--l1)">Ausgezahlt</span>`:`<span class="hint">Offen</span>`}</td>
      ${W?`<td><button class="btn sm ghost" data-act="row-del" data-id="${r.kontoId}" aria-label="${esc(k.name)} entfernen">×</button></td>`:""}</tr>`}).join("")}
     <tr><td><b>Gesamt</b></td>${TARIF.map(([k])=>`<td class="num"><b>${rows.reduce((s,r)=>s+(+r[k]||0),0)}</b></td>`).join("")}<td class="num"><b style="color:var(--acc);font-size:14px">${money(total)}</b></td><td></td>${W?"<td></td>":""}</tr>
