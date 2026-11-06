@@ -878,13 +878,17 @@ const whoPicker=sel=>`<div class="f"><span>Wer bist du?</span><div style="displa
 /* Profil für alle ohne Login: Namen wählen oder Gast */
 const getMe=()=>{try{return localStorage.getItem("hrz-me")||""}catch{return""}};
 const setMe=v=>{try{localStorage.setItem("hrz-me",v)}catch{}};
-const meId=()=>HR.uid?getWho():(getMe()!=="gast"?getMe():"");
-function applyMe(){if(HR.uid)return;const k=konto(getMe()),el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}}
+const meId=()=>HR.uid?getWho():(getMe()!=="gast"&&!konto(getMe())?.leitung?getMe():"");
+function applyMe(){if(HR.uid)return;let k=konto(getMe());if(k&&k.leitung){setMe("gast");k=null}const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}}
 function openMe(){const b=$("#loginBody");UI.meSel=getMe()==="gast"?"":getMe();
   const chips=()=>`<div style="display:flex;gap:8px;flex-wrap:wrap;max-height:46vh;overflow:auto;padding:2px">${sortedKonten().map(k=>`<button type="button" class="btn${k.id===UI.meSel?" pri":""}" data-me-pick="${k.id}" aria-pressed="${k.id===UI.meSel}">${esc(k.name)}</button>`).join("")}</div>`;
-  b.innerHTML=`<header><div><div class="eyebrow">Willkommen bei HR Zentral</div><h2 id="loginT">Wer bist du?</h2><p>Dann ist dein Name bei LI-Werbung, Feedback und Geschenk schon ausgewählt. Kein Passwort nötig, du kannst jederzeit unten links wechseln.</p></div><button class="ibtn" data-me-gast aria-label="Schließen">×</button></header>
-   <div id="meBox">${chips()}</div><div class="row" style="gap:8px;margin-top:6px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-save style="flex:1">Übernehmen</button></div>`;
+  b.innerHTML=`<header><div><div class="eyebrow">Willkommen bei HR Zentral</div><h2 id="loginT">Wer bist du?</h2><p>Dann ist dein Name bei LI-Werbung, Feedback und Geschenk schon ausgewählt. Kein Passwort nötig, nur die Leitung braucht ihres. Wechseln geht jederzeit unten links.</p></div><button class="ibtn" data-me-gast aria-label="Schließen">×</button></header>
+   <div id="meBox">${chips()}</div><div id="meFoot">${meFoot()}</div>`;
   b._chips=chips;$("#loginDlg").showModal()}
+function meFoot(){const k=konto(UI.meSel);if(k&&k.leitung)return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">${esc(k.name)} gehört zur Leitung, dafür braucht es das Leitungs-Passwort.</span>
+    <label class="f" for="meP">Passwort<input class="i" id="meP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
+    <div class="row" style="gap:8px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-login style="flex:1">Anmelden</button></div></div>`;
+  return`<div class="row" style="gap:8px;margin-top:6px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-save style="flex:1">Übernehmen</button></div>`}
 function applyWho(){const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}}}
 function openWho(){const b=$("#loginBody");UI.whoSel=getWho();
   b.innerHTML=`<header><div><div class="eyebrow">Leitung</div><h2 id="loginT">Wer bist du?</h2><p>Damit im Änderungsprotokoll steht, wer was gemacht hat.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
@@ -1871,7 +1875,9 @@ function openLogin(){const b=$("#loginBody");
 const authErr=e=>({"auth/invalid-credential":"Das Passwort ist falsch.","auth/wrong-password":"Das Passwort ist falsch.","auth/user-not-found":"Das Passwort ist falsch.","auth/requires-recent-login":"Bitte einmal ab- und wieder anmelden, dann nochmal ändern.","auth/email-already-in-use":"Das Passwort wurde schon festgelegt. Melde dich normal an.","auth/weak-password":"Das Passwort braucht mindestens 6 Zeichen.","auth/too-many-requests":"Zu viele Versuche. Warte kurz und versuch es nochmal.","auth/operation-not-allowed":"In Firebase ist die Anmeldung mit E-Mail und Passwort noch nicht eingeschaltet."}[e&&e.code]||"Das hat nicht geklappt. Bitte nochmal versuchen.");
 $("#loginDlg").addEventListener("click",async e=>{
   if(e.target===e.currentTarget||e.target.closest("[data-close-login]")){$("#loginDlg").close();return}
-  const mp=e.target.closest("[data-me-pick]");if(mp){UI.meSel=mp.dataset.mePick;$("#meBox").innerHTML=$("#loginBody")._chips();return}
+  const mp=e.target.closest("[data-me-pick]");if(mp){UI.meSel=mp.dataset.mePick;$("#meBox").innerHTML=$("#loginBody")._chips();$("#meFoot").innerHTML=meFoot();setTimeout(()=>$("#meP")?.focus(),30);return}
+  if(e.target.closest("[data-me-login]")){const pw=$("#meP").value;if(!pw){$("#lgMsg").textContent="Passwort eingeben.";return}$("#lgMsg").textContent="Melde an …";setWho(UI.meSel);setMe(UI.meSel);
+    try{await HR.login(pw)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
   if(e.target.closest("[data-me-save]")){if(!UI.meSel){toast("Wähle deinen Namen oder „Ich bin Gast“.");return}setMe(UI.meSel);applyMe();$("#loginDlg").close();UI.fb=null;render();toast(`Hallo ${konto(UI.meSel)?.name.split(" ")[0]||""}!`);return}
   if(e.target.closest("[data-me-gast]")){if(!getMe()||e.target.closest(".row"))setMe("gast");applyMe();$("#loginDlg").close();render();return}
   const wp=e.target.closest("[data-who-pick]");if(wp){UI.whoSel=wp.dataset.whoPick;$("#whoBox").innerHTML=whoPicker(UI.whoSel);return}
@@ -1879,10 +1885,10 @@ $("#loginDlg").addEventListener("click",async e=>{
   if(e.target.closest("[data-login]")){if(!UI.whoSel){$("#lgMsg").textContent="Wähle zuerst aus, wer du bist.";return}setWho(UI.whoSel);$("#lgMsg").textContent="Melde an …";try{await HR.login($("#lgP").value)}catch(er){$("#lgMsg").textContent=authErr(er)}}
   if(e.target.closest("[data-setup]")){if($("#suP").value!==$("#suP2").value){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}$("#lgMsg").textContent="Richte ein und übernehme die Daten …";try{await HR.setup($("#suP").value)}catch(er){$("#lgMsg").textContent=authErr(er)}}
 });
-document.addEventListener("click",e=>{if(HR.uid&&e.target.closest("#meName")){openWho();return}if(!HR.uid&&e.target.closest("#meName")&&S.konten.length){openMe();return}const a=e.target.closest("[data-auth]");if(a){if(HR.uid)HR.logout();else openLogin();return}
+document.addEventListener("click",e=>{if(HR.uid&&e.target.closest("#meName")){openWho();return}if(!HR.uid&&e.target.closest("#meName")&&S.konten.length){openMe();return}const a=e.target.closest("[data-auth]");if(a){if(HR.uid){setMe("gast");HR.logout()}else if(S.konten.length)openMe();else openLogin();return}
   const z=e.target.closest("[data-zoom]");if(z){e.preventDefault();$("#zoomImg").src=imgSrc(z.dataset.zoom);$("#zoom").hidden=false;return}
   if(e.target.closest("#zoom"))$("#zoom").hidden=true},true);
-$("#loginDlg").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("input")){e.preventDefault();($("[data-login]")||$("[data-setup]"))?.click()}});
+$("#loginDlg").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("input")){e.preventDefault();($("[data-me-login]")||$("[data-login]")||$("[data-setup]"))?.click()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#zoom").hidden=true;if(e.key==="Enter"&&e.target.matches("[data-zoom]"))e.target.click()});
 /* ---------- Start ---------- */
 let h0=location.hash.slice(1);if(h0==="benutzer")h0="konten";if(h0==="hierarchie")h0="konten";if(TABS_ALL.some(t=>t[0]===h0))UI.tab=h0;
