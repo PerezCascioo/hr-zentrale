@@ -603,6 +603,18 @@ select.i option:checked{background:var(--acc);color:#fff}
   background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 38%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
 .abz svg{width:11px;height:11px}
 .mebadges{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mebadges .abz{font-size:11.5px;padding:4px 10px 4px 8px}.mebadges .abz svg{width:13px;height:13px}
+/* Abzeichen in den Einstellungen */
+.abzbar,.abzp{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 4px}.abzbar i,.abzp i{display:block;height:100%;border-radius:inherit;background:var(--acc)}
+.abzp{height:4px;margin:6px 0 2px}.abzp i{background:color-mix(in srgb,var(--c) 70%,#888)}
+.abzh{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.abzgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.abzc{display:flex;gap:11px;align-items:flex-start;padding:11px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);opacity:.72;filter:saturate(.3)}
+.abzc.on{opacity:1;filter:none;border-color:color-mix(in srgb,var(--c) 40%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,transparent),rgba(255,255,255,.02));box-shadow:0 0 22px -10px var(--c)}
+.abzi{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--muted);background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.18)}
+.abzi svg{width:17px;height:17px}
+.abzc.on .abzi{color:#1a1206;background:radial-gradient(circle at 35% 30%,#fff8,transparent 55%),var(--c);border:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent)}
+.abzt{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.abzt b{font-size:13px}.abzt b small{font-size:11px;color:var(--c)}.abzt span{font-size:11.5px;color:var(--muted);line-height:1.35}
+.abzt em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted)}.abzc.on .abzt em{color:var(--c)}
 /* Polizei-Nacht */
 .th-police{background:linear-gradient(180deg,#03040c 0%,#070a1c 55%,#0b0d1e 100%)}
 .th-police .pl{position:absolute;top:-22vh;width:70vw;height:70vh;border-radius:50%;filter:blur(70px);opacity:0;mix-blend-mode:screen}
@@ -675,7 +687,7 @@ select.i option:checked{background:var(--acc);color:#fff}
 <dialog id="settings" aria-labelledby="setT">
   <div class="dlg">
     <header><div><div class="eyebrow">Dein Konto</div><h2 id="setT">Einstellungen</h2><p>Farben, Bewegung und Profilbild. Gilt nur für dich.</p></div><button class="ibtn" data-close aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
-    <div class="seg" id="setTabs"><button data-st="acc" aria-pressed="true">Akzentfarbe</button><button data-st="bg" aria-pressed="false">Hintergrund</button><button data-st="stars" aria-pressed="false">Stil</button></div>
+    <div class="seg" id="setTabs"><button data-st="acc" aria-pressed="true">Akzentfarbe</button><button data-st="bg" aria-pressed="false">Hintergrund</button><button data-st="stars" aria-pressed="false">Stil</button><button data-st="abz" aria-pressed="false">Abzeichen</button></div>
     <div id="setBody"></div>
     <div class="dsec" id="aiSec" hidden></div>
     <div class="dsec" id="winterSec"></div>
@@ -868,7 +880,7 @@ const IC={
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', edit:'<path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/>',
  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>',
  star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>', gauge:'<path d="M12 14l4-4M3 18a9 9 0 1 1 18 0"/>',
- plus:'<path d="M12 5v14M5 12h14"/>', clip:'<path d="M9 11l6-6M5 13l6 6"/>' };
+ plus:'<path d="M12 5v14M5 12h14"/>', lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', clip:'<path d="M9 11l6-6M5 13l6 6"/>' };
 const svg=(n,s="")=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${s}>${IC[n]||""}</svg>`;
 
 window.TABS_ALL=[
@@ -1036,6 +1048,18 @@ function badgesOf(kid){const k=konto(kid);if(!k)return[];const s=badgeStats()[ki
   if(d>=365)out.push(["clock","1 Jahr dabei","g","Seit über einem Jahr in der HR"]);else if(d>=182)out.push(["clock","6 Monate dabei","s","Seit über 6 Monaten in der HR"]);else if(d>=91)out.push(["clock","3 Monate dabei","b","Seit über 3 Monaten in der HR"]);else if(d>=30)out.push(["clock","1 Monat dabei","b","Seit über einem Monat in der HR"]);
   return out}
 const badgeChip=([ic,l,t,tip])=>`<span class="abz" style="--c:${TIER[t]}" title="${esc(tip)}">${svg(ic)}${esc(l)}</span>`;
+function abzKatalog(kid){const k=kid&&konto(kid),s=(k&&badgeStats()[kid])||{li:0,pr:0,ein:0,top:0,gift:0},d=k&&k.angelegt?Math.floor((Date.now()-k.angelegt)/864e5):0;
+  return[["Lifeinvader",[["mega","Werber","b","10 angenommene LI-Werbungen",s.li,10],["mega","Werbeprofi","s","50 angenommene LI-Werbungen",s.li,50],["mega","LI-Legende","g","100 angenommene LI-Werbungen",s.li,100]]],
+   ["Prüfungen & Einstellungen",[["check","Prüfer","s","25 Prüfungen erstellt oder bearbeitet",s.pr,25],["check","Prüfungs-Ass","g","100 Prüfungen erstellt oder bearbeitet",s.pr,100],["userplus","Recruiter","s","10 Mitarbeiter eingestellt",s.ein,10]]],
+   ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung einer abgeschlossenen Woche",s.top,1,s.top>1?"×"+s.top:""],["coin","Glückspilz","g","Geschenk der Woche als Erster geöffnet",s.gift,1,s.gift>1?"×"+s.gift:""]]],
+   ["Treue",[["clock","1 Monat dabei","b","30 Tage in der HR",d,30],["clock","3 Monate dabei","b","91 Tage in der HR",d,91],["clock","6 Monate dabei","s","182 Tage in der HR",d,182],["clock","1 Jahr dabei","g","365 Tage in der HR",d,365]]]]}
+function vAbzSet(){const kid=meId(),k=kid&&konto(kid),kat=abzKatalog(kid),all=kat.flatMap(g=>g[1]),got=k?all.filter(x=>x[4]>=x[5]).length:0;
+  const card=([ic,l,t,desc,v,goal,x])=>{const ok=k&&v>=goal,pc=Math.min(100,Math.round((v||0)/goal*100));
+    return`<div class="abzc${ok?" on":""}" style="--c:${TIER[t]}"><span class="abzi">${svg(ok?ic:"lock")}</span><div class="abzt"><b>${esc(l)}${ok&&x?` <small>${x}</small>`:""}</b><span>${esc(desc)}</span>
+      ${ok?`<em>Freigeschaltet</em>`:k?`<div class="abzp"><i style="width:${pc}%"></i></div><em>${goal===1?"Noch nicht erreicht":`${Math.min(v,goal)} / ${goal}`}</em>`:`<em>Gesperrt</em>`}</div></div>`};
+  return`<div class="dsec" style="border:0;padding:0"><h3>Abzeichen</h3><p>${k?`${esc(k.name)}: <b>${got} von ${all.length}</b> freigeschaltet. Sie kommen automatisch, du musst nichts eintragen.`:"Wähle oben links dein Profil, dann siehst du deinen Fortschritt."}</p>
+    <div class="abzbar"><i style="width:${Math.round(got/all.length*100)}%"></i></div>
+    ${kat.map(([h,xs])=>`<div class="abzh">${h}</div><div class="abzgrid">${xs.map(card).join("")}</div>`).join("")}</div>`}
 function badgeRow(kid,max){const b=badgesOf(kid);if(!b.length)return"";const sh=max?b.slice(0,max):b,rest=b.length-sh.length;
   return`<span class="abzs">${sh.map(badgeChip).join("")}${rest>0?`<span class="abz" style="--c:var(--muted)" title="${esc(b.slice(max).map(x=>x[1]).join(", "))}">+${rest}</span>`:""}</span>`}
 function vUeberblick(){
@@ -1666,6 +1690,7 @@ function renderSet(){
       <div class="row" style="gap:8px"><label class="btn" for="bgFile" style="cursor:pointer">${svg("image")}${im?"Anderes Bild wählen":"Bild hochladen"}</label><input type="file" id="bgFile" accept="image/*" hidden>${im?`<button class="btn danger" data-bgimgdel>Entfernen</button>`:""}</div>
       <label class="f" for="bgDim">Abdunkeln: <span id="bgDimV">${P.bgDim??45}%</span><input type="range" id="bgDim" min="0" max="85" value="${P.bgDim??45}"></label>
       <label class="f" for="bgBlur">Unschärfe: <span id="bgBlurV">${P.bgBlur??0}px</span><input type="range" id="bgBlur" min="0" max="20" value="${P.bgBlur??0}"></label></div>`:""}</div>`}
+  if(UI.st==="abz")b.innerHTML=vAbzSet();
   const ai=$("#aiSec");ai.hidden=HR.role<3;if(HR.role>=3)ai.innerHTML=`<h3>Sicherung</h3><p>Lädt alle Daten als Datei herunter: Mitarbeiter, Wochen und Auszahlungen, Richtlinien, Nachweise, Feedback und Protokoll. Am besten ab und zu machen.</p><div class="row"><button class="btn" data-backup>${svg("check")}Sicherung herunterladen</button></div><div style="height:8px"></div><h3>Leitungs-Passwort ändern</h3><p>Gilt sofort für alle aus der Leitung.</p><div class="row"><label class="f" for="npw">Neues Passwort<input class="i" id="npw" type="password" autocomplete="new-password"></label><button class="btn" data-pwsave>Passwort ändern</button></div><div style="height:8px"></div><h3>KI für automatische Auswertung (optional, kostenpflichtig)</h3><p>Google-Gemini-Schlüssel aus Google AI Studio. Wird geschützt gespeichert und ist nur für die Leitung nutzbar.</p>
     <div class="row"><label class="f" for="aiK">API-Schlüssel<input class="i mono" id="aiK" type="password" value="${esc(HR.ai?.key||"")}" autocomplete="off"></label><label class="f" for="aiM" style="flex:0 1 230px">Modell<input class="i mono" id="aiM" value="${esc(HR.ai?.model||"gemini-flash-lite-latest")}"></label><button class="btn pri" data-aisave>Speichern</button></div>
     <span class="status">${HR.ai?.key?"Schlüssel ist hinterlegt. Die automatische Auswertung ist aktiv.":"Noch kein Schlüssel hinterlegt."}</span>`;
