@@ -257,6 +257,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--s2c) 60%,transparent)}
 .tact{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
 .tact select{width:auto;padding:6px 8px;font-size:12px}
 
+/* Mitarbeiterliste */
+table.ml tr.grp td{background:var(--s1c);padding:9px 16px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2)}
+table.ml tbody tr.grp:hover td{background:var(--s1c)}
+.gdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.gcnt{margin-left:8px;color:var(--muted);font-weight:600}
+table.ml .who small{font-weight:500;color:var(--muted);font-size:11px}
+.fchip .gdot{margin-right:6px}
+.btn:disabled{opacity:.25;cursor:default}
+
 /* Protokoll */
 .log>div{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;padding:12px 18px;border-top:1px solid var(--line);align-items:center;font-size:12.5px}
 .log>div:first-child{border-top:0}
@@ -1552,26 +1561,40 @@ function loginCell(k){return"";const a=HR.admins[k.id];
   if(UI.newLogin===k.id)return`<div class="tact" style="margin-top:6px;flex-wrap:wrap"><input class="i" id="nlE" type="email" placeholder="E-Mail" style="width:190px;padding:6px 10px" autocomplete="off"><input class="i" id="nlP" type="text" placeholder="Passwort (mind. 6)" style="width:150px;padding:6px 10px" autocomplete="off"><button class="btn sm pri" data-act="login-save" data-id="${k.id}">Login anlegen</button><button class="btn sm ghost" data-act="login-new" data-id="">Abbrechen</button></div>`;
   return`<div style="margin-top:6px"><button class="btn sm ghost" data-act="login-new" data-id="${k.id}">${KEYI}Login anlegen</button></div>`}
 const KEYI='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>';
+const RANKS=["Assistant Director of FIB (Berater)","Head of Department (Leader)","Deputy Head of Department (Vize)","Senior Human Resources Agent","Human Resources Agent","Human Resources Trainee","Aushilfe"];
+const RANK_S=["Berater","Leader","Vize","Senior Agent","Agent","Trainee","Aushilfe"];
+const RANK_C=["var(--l3)","var(--l3)","var(--l3)","var(--l2)","var(--l1)","#7aa7ff","var(--l0)"];
 function vKonten(){
-  const q=UI.q.toLowerCase(),all=sortedKonten(),ks=all.filter(k=>!q||k.name.toLowerCase().includes(q)),W=writable();
-  return page("konten","Mitarbeiterliste",`${S.konten.length} Mitarbeiter in der HR.`)+
-  (W?`<div class="card pad" style="margin-bottom:14px"><div class="row">
+  const q=UI.q.toLowerCase().trim(),all=sortedKonten(),W=writable();
+  const gk=k=>{const i=RANKS.indexOf(k.position||"");return i>=0?String(i):(k.position?"x:"+k.position:"none")};
+  const keys=[...RANKS.map((_,i)=>String(i)),...[...new Set(all.map(k=>k.position).filter(p=>p&&!RANKS.includes(p)))].map(p=>"x:"+p),"none"];
+  const label=g=>g==="none"?"Ohne Position":g.startsWith("x:")?g.slice(2):RANKS[+g];
+  const short=g=>g==="none"?"Ohne Position":g.startsWith("x:")?g.slice(2):RANK_S[+g];
+  const color=g=>/^\d+$/.test(g)?RANK_C[+g]:"var(--l0)";
+  const groups=keys.map(g=>({g,list:all.filter(k=>gk(k)===g)})).filter(x=>x.list.length);
+  const f=groups.some(x=>x.g===UI.lv)?UI.lv:"all";
+  const shown=groups.filter(x=>f==="all"||x.g===f).map(x=>({...x,list:x.list.filter(k=>!q||k.name.toLowerCase().includes(q))})).filter(x=>x.list.length);
+  const nLead=all.filter(k=>k.leitung).length,cols=W?4:1;
+  const addBtn=W?`<button class="btn${UI.addOpen?"":" pri"}" data-act="add-toggle">${svg(UI.addOpen?"check":"userplus")}${UI.addOpen?"Schließen":"Mitarbeiter hinzufügen"}</button>`:"";
+  const form=W&&UI.addOpen?`<div class="card pad" style="margin-bottom:14px"><div class="row">
     <label class="f" for="nN">Name<input class="i" id="nN" placeholder="z. B. Alex Meyer" autocomplete="off"></label>
-    <<label class="f" for="nF">Position<input class="i" id="nF" placeholder="z. B. Human Resources Trainee" list="posList" autocomplete="off"></label>
+    <label class="f" for="nF">Position<input class="i" id="nF" placeholder="z. B. Human Resources Trainee" list="posList" autocomplete="off"></label>
     <label class="f" for="nP" style="flex:0 1 180px">Reisepass (optional)<input class="i mono" id="nP" autocomplete="off"></label>
     <label class="f" for="nL" style="flex:0 0 auto;flex-direction:row;align-items:center;gap:8px;padding-bottom:10px"><input type="checkbox" id="nL"> Leitung</label>
     <button class="btn pri" data-act="acc-add">${svg("userplus")}Hinzufügen</button></div>
-    <datalist id="posList">${[...new Set(S.konten.map(k=>k.position).filter(Boolean))].map(p=>`<option value="${esc(p)}">`).join("")}</datalist>
-    <p class="hint" style="margin:10px 0 0">Mit ▲ ▼ legst du die Reihenfolge fest. „Leitung“ bekommt nur Lifeinvader ausgezahlt.</p></div>`:"")+
-  `<div class="card"><div class="toolbar"><input class="i" id="q" type="search" placeholder="Name suchen" value="${esc(UI.q)}" aria-label="Mitarbeiter durchsuchen"></div>
-  ${ks.length?`<div class="tbox"><table style="min-width:560px"><thead><tr>${W?"<th></th>":""}<th>Name</th><th>Position</th><th>Seit</th>${W?"<th>Reisepass</th><th>Aktionen</th>":""}</tr></thead><tbody>
-  ${ks.map(k=>{const p=String(k.pass||""),sh=UI.showPass[k.id],ren=UI.rename===k.id,ix=all.indexOf(k);return`<tr>
-   ${W?`<td style="width:64px"><span class="tact" style="gap:2px"><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-i="-1" aria-label="Nach oben"${ix===0?" disabled":""}>▲</button><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-i="1" aria-label="Nach unten"${ix===all.length-1?" disabled":""}>▼</button></span></td>`:""}
-   <td>${ren?`<input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name">`:`<span class="who"><span class="av">${initials(k.name)}</span><span style="display:flex;flex-direction:column;gap:4px">${esc(k.name)}${badgeRow(k.id,3)}</span></span>`}</td>
-   <td>${ren?`<span class="tact"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:220px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label></span>`:`${k.position?esc(k.position):`<span class="hint">–</span>`}${k.leitung?' <span class="badge" style="color:var(--l2)">Leitung</span>':""}`}</td>
-   <td class="num">${fmtDate(k.angelegt)}</td>
+    <p class="hint" style="margin:10px 0 0">„Leitung“ bekommt nur Lifeinvader ausgezahlt.</p></div>`:"";
+  const dl=W?`<datalist id="posList">${[...new Set([...RANKS,...S.konten.map(k=>k.position).filter(Boolean)])].map(p=>`<option value="${esc(p)}">`).join("")}</datalist>`:"";
+  const row=(k,list,j)=>{const p=String(k.pass||""),sh=UI.showPass[k.id],ren=UI.rename===k.id,up=list[j-1],dn=list[j+1];return`<tr>
+   ${W?`<td style="width:64px"><span class="tact" style="gap:2px"><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${up?up.id:""}" aria-label="Nach oben"${up?"":" disabled"}>▲</button><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${dn?dn.id:""}" aria-label="Nach unten"${dn?"":" disabled"}>▼</button></span></td>`:""}
+   <td>${ren?`<div class="tact" style="flex-wrap:wrap"><input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:240px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label></div>`:
+    `<span class="who"><span class="av">${initials(k.name)}</span><span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
    ${W?`<td>${ren?`<input class="i mono" id="rp-${k.id}" value="${esc(p)}" inputmode="numeric" style="width:120px;padding:6px 10px" aria-label="Reisepassnummer">`:p?`<span class="tact"><span class="mono">${sh?esc(p):"••••"+esc(p.slice(-4))}</span><button class="btn sm ghost" data-act="pass" data-id="${k.id}">${sh?"Verbergen":"Anzeigen"}</button></span>`:`<span class="hint">–</span>`}</td>
-   <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button><button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`}).join("")}
+   <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button><button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
+  return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
+  `<div class="card"><div class="toolbar"><input class="i" id="q" type="search" placeholder="Name suchen" value="${esc(UI.q)}" aria-label="Mitarbeiter durchsuchen">
+   <div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
+  ${shown.length?`<div class="tbox"><table class="ml" style="min-width:${W?560:0}px"><thead><tr>${W?"<th></th>":""}<th>Mitarbeiter</th>${W?"<th>Reisepass</th><th>Aktionen</th>":""}</tr></thead><tbody>
+  ${shown.map(x=>`<tr class="grp"><td colspan="${cols}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(label(x.g))}<span class="gcnt num">${x.list.length}</span></td></tr>${x.list.map((k,j)=>row(k,x.list,j)).join("")}`).join("")}
   </tbody></table></div>`:`<div class="empty" style="border:0">Keine Mitarbeiter gefunden.</div>`}</div>`;
 }
 
@@ -1692,7 +1715,8 @@ document.addEventListener("click",async e=>{
   if(a==="acc-ren"){UI.rename=id||null;render();return}
   if(a==="acc-ren-save"){const k=konto(id),n=($("#rn-"+id)?.value||"").trim(),pos=($("#rf-"+id)?.value||"").trim(),ld=!!$("#rl-"+id)?.checked;if(!k||!n)return;if(S.konten.some(x=>x.id!==id&&x.name.toLowerCase()===n.toLowerCase())){toast("Diesen Namen gibt es schon.");return}
     if(await write(()=>db.doc("konten/"+id).update({name:n,position:pos,leitung:ld,pass:($("#rp-"+id)?.value??String(k.pass||"")).trim().slice(0,20)}),`Mitarbeiter ${n} bearbeitet (${pos||"keine Position"}${ld?", Leitung":""})`))toast("Gespeichert");UI.rename=null;render();return}
-  if(a==="mv"){const all=sortedKonten(),ix=all.findIndex(k=>k.id===id),j=ix+i;if(ix<0||j<0||j>=all.length)return;
+  if(a==="add-toggle"){UI.addOpen=!UI.addOpen;render();return}
+  if(a==="mv"){const all=sortedKonten(),ix=all.findIndex(k=>k.id===id),j=t.dataset.to!==undefined?(t.dataset.to?all.findIndex(k=>k.id===t.dataset.to):-1):ix+i;if(ix<0||j<0||j>=all.length)return;
     const order=all.map(k=>k.id);[order[ix],order[j]]=[order[j],order[ix]];
     for(let n=0;n<order.length;n++){const k=konto(order[n]);if(k&&k.ord!==n+1){k.ord=n+1;await db.doc("konten/"+k.id).update({ord:n+1}).catch(()=>{})}}
     render();return}
