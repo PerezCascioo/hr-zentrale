@@ -970,7 +970,7 @@ const whoPicker=sel=>`<div class="f"><span>Wer bist du?</span><div style="displa
 const getMe=()=>{try{return localStorage.getItem("hrz-me")||""}catch{return""}};
 const setMe=v=>{try{localStorage.setItem("hrz-me",v)}catch{}};
 const meId=()=>HR.uid?getWho():(getMe()!=="gast"&&!konto(getMe())?.leitung?getMe():"");
-function applyMe(){if(HR.uid)return;let k=konto(getMe());if(k&&k.leitung){setMe("gast");k=null}const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}}
+function applyMe(){if(HR.uid)return;let k=konto(getMe());if(k&&k.leitung){setMe("gast");k=null}const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
 function openMe(){const b=$("#loginBody");UI.meSel=getMe()==="gast"?"":getMe();
   const chips=()=>`<div style="display:flex;gap:8px;flex-wrap:wrap;max-height:46vh;overflow:auto;padding:2px">${sortedKonten().map(k=>`<button type="button" class="btn${k.id===UI.meSel?" pri":""}" data-me-pick="${k.id}" aria-pressed="${k.id===UI.meSel}">${esc(k.name)}</button>`).join("")}</div>`;
   b.innerHTML=`<header><div><div class="eyebrow">Willkommen bei HR Zentral</div><h2 id="loginT">Wer bist du?</h2><p>Dann ist dein Name bei LI-Werbung, Feedback und Geschenk schon ausgewählt. Kein Passwort nötig, nur die Leitung braucht ihres. Wechseln geht jederzeit unten links.</p></div><button class="ibtn" data-me-gast aria-label="Schließen">×</button></header>
@@ -980,7 +980,7 @@ function meFoot(){const k=konto(UI.meSel);if(k&&k.leitung)return`<div class="sta
     <label class="f" for="meP">Passwort<input class="i" id="meP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
     <div class="row" style="gap:8px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-login style="flex:1">Anmelden</button></div></div>`;
   return`<div class="row" style="gap:8px;margin-top:6px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-save style="flex:1">Übernehmen</button></div>`}
-function applyWho(){const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}}}
+function applyWho(){const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}setTimeout(()=>syncPic(),800)}}
 function openWho(){const b=$("#loginBody");UI.whoSel=getWho();
   b.innerHTML=`<header><div><div class="eyebrow">Leitung</div><h2 id="loginT">Wer bist du?</h2><p>Damit im Änderungsprotokoll steht, wer was gemacht hat.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
    <div id="whoBox">${whoPicker(UI.whoSel)}</div><span class="status" id="lgMsg"></span><button class="btn pri block" data-who-save>Übernehmen</button>`;
@@ -1561,6 +1561,15 @@ function loginCell(k){return"";const a=HR.admins[k.id];
   if(UI.newLogin===k.id)return`<div class="tact" style="margin-top:6px;flex-wrap:wrap"><input class="i" id="nlE" type="email" placeholder="E-Mail" style="width:190px;padding:6px 10px" autocomplete="off"><input class="i" id="nlP" type="text" placeholder="Passwort (mind. 6)" style="width:150px;padding:6px 10px" autocomplete="off"><button class="btn sm pri" data-act="login-save" data-id="${k.id}">Login anlegen</button><button class="btn sm ghost" data-act="login-new" data-id="">Abbrechen</button></div>`;
   return`<div style="margin-top:6px"><button class="btn sm ghost" data-act="login-new" data-id="${k.id}">${KEYI}Login anlegen</button></div>`}
 const KEYI='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>';
+const avPic=k=>{if(!k)return"";const v=k.pic?imgSrc(k.pic):"";return v||imgSrc("bild:pp-"+k.id)};
+const avOf=(k,st="")=>{const src=avPic(k);return`<span class="av"${st?` style="${st}"`:""}>${src?`<img src="${esc(src)}" alt="">`:initials(k?.name)}</span>`};
+async function syncPic(force){const kid=meId(),k=konto(kid);if(!k||!db)return;if(!force&&UI.picSynced===kid)return;UI.picSynced=kid;
+  const want=P.pic||"";if(!force&&(!want||k.pic))return;
+  let src="";if(want){src=imgSrc(want)||(String(want).startsWith("bild:")&&HR._getImg?await HR._getImg(want.slice(5)):want)}
+  if(HR._setImg)HR._setImg("pp-"+kid,src||"");
+  try{await db.doc("konten/"+kid).update({pic:want})}catch{}
+  try{if(src)await db.doc("bilder/pp-"+kid).set({src,zeit:Date.now()});else await db.doc("bilder/pp-"+kid).delete()}catch{}
+  if(UI.tab==="konten")render()}
 const RANKS=["Assistant Director of FIB (Berater)","Head of Department (Leader)","Deputy Head of Department (Vize)","Senior HR Agent","Human Resources Agent","Human Resources Trainee","Aushilfe"];
 const RANK_S=["Berater","Leader","Vize","Senior Agent","Agent","Trainee","Aushilfe"];
 const rankNorm=p=>String(p||"").toLowerCase().replace(/human\s+res+ources?/g,"hr").replace(/\s+/g," ").trim();
@@ -1589,7 +1598,7 @@ function vKonten(){
   const row=(k,list,j)=>{const p=String(k.pass||""),sh=UI.showPass[k.id],ren=UI.rename===k.id,up=list[j-1],dn=list[j+1];return`<tr>
    ${W?`<td style="width:64px"><span class="tact" style="gap:2px"><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${up?up.id:""}" aria-label="Nach oben"${up?"":" disabled"}>▲</button><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${dn?dn.id:""}" aria-label="Nach unten"${dn?"":" disabled"}>▼</button></span></td>`:""}
    <td>${ren?`<div class="tact" style="flex-wrap:wrap"><input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:240px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label></div>`:
-    `<span class="who"><span class="av">${initials(k.name)}</span><span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
+    `<span class="who">${avOf(k)}<span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
    ${W?`<td>${ren?`<input class="i mono" id="rp-${k.id}" value="${esc(p)}" inputmode="numeric" style="width:120px;padding:6px 10px" aria-label="Reisepassnummer">`:p?`<span class="tact"><span class="mono">${sh?esc(p):"••••"+esc(p.slice(-4))}</span><button class="btn sm ghost" data-act="pass" data-id="${k.id}">${sh?"Verbergen":"Anzeigen"}</button></span>`:`<span class="hint">–</span>`}</td>
    <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button><button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
   return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
@@ -1832,7 +1841,7 @@ $("#settings").addEventListener("click",async e=>{
   if(e.target.closest("[data-aisave]")){const k=$("#aiK").value.trim(),m=$("#aiM").value.trim()||"gemini-flash-lite-latest";try{await HR.saveAI(k,m);HR.ai={key:k,model:m};toast("KI-Schlüssel gespeichert. Seite lädt neu.");setTimeout(()=>location.reload(),900)}catch{toast("Speichern fehlgeschlagen.")}return}
   if(e.target.closest("[data-winter]")){setP({winter:!P.winter});toast(P.winter?"Winter-Special an":"Winter-Special aus");return}
   const md=e.target.closest("[data-mode]");if(md){setP({mode:md.dataset.mode});return}
-  if(e.target.closest("#ppDel")){setP({pic:""});toast("Profilbild entfernt")}
+  if(e.target.closest("#ppDel")){setP({pic:""});toast("Profilbild entfernt");syncPic(true)}
 });
 $("#settings").addEventListener("input",e=>{const id=e.target.id,v=e.target.value;
   if(id==="bgDim"||id==="bgBlur"){const k=id==="bgDim"?"bgDim":"bgBlur";P[k]=+v;applyCustomVars();$("#"+id+"V").textContent=v+(id==="bgDim"?"%":"px");try{localStorage.setItem("hrz-pref",JSON.stringify(P))}catch{}clearTimeout(syncT);syncT=setTimeout(()=>{if(db&&uid)db.doc(`data/users/${uid}/prefs`).set({...P}).catch(()=>{})},800);return}
@@ -1840,7 +1849,7 @@ $("#settings").addEventListener("input",e=>{const id=e.target.id,v=e.target.valu
   if(id==="accH"&&validHex(v))setP({acc:v.toLowerCase()});if(id==="bgH"&&validHex(v))setP({bg:darken(v.toLowerCase())})});
 $("#ppFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;if(f.size>3*1024*1024){toast("Das Bild ist größer als 3 MB.");return}
   if(!assets){toast("Hochladen ist hier nicht möglich.");return}toast("Profilbild wird hochgeladen …");
-  try{const r=await assets.upload(f);setP({pic:r.url});toast("Profilbild gespeichert")}catch{toast("Hochladen fehlgeschlagen.")}});
+  try{const r=await assets.upload(f);setP({pic:r.url});toast("Profilbild gespeichert");syncPic(true)}catch{toast("Hochladen fehlgeschlagen.")}});
 
 /* ---------- Sterne ---------- */
 let starsArr=[],raf;
