@@ -800,6 +800,8 @@ function C(path){const c=F.collection(fs,path);return{...Q(c),add:d=>F.addDoc(c,
 const db={doc:D,collection:C};
 const get=async p=>{try{const s=await F.getDoc(F.doc(fs,p));return s.exists()?s.data():null}catch{return null}};
 HR._getImg=async id=>(await get("bilder/"+id))?.src||"";
+/* Nur der Erste: in einer Transaktion anlegen, nie überschreiben */
+HR.claimOnce=async(path,data)=>{const r=F.doc(fs,path);return F.runTransaction(fs,async tx=>{const s=await tx.get(r);if(s.exists())return{won:false,data:s.data()};const d={...data,zeit:F.serverTimestamp()};tx.set(r,d);return{won:true}}).catch(perm)};
 
 /* Bilder verkleinern, damit sie kostenlos in die Datenbank passen */
 async function shrink(file,maxW,q){const url=typeof file==="string"?file:URL.createObjectURL(file);
@@ -1082,7 +1084,8 @@ function openGift(){const wk=weekOf(),g=giftOf(wk.id),b=$("#giftBody");const fd=
 async function doGift(){const kid=$("#gName").value,k=konto(kid),wk=weekOf(),msg=$("#gMsg");if(!k){msg.textContent="Wähle zuerst deinen Namen aus.";return}
   const bt=$("[data-gift-open]");bt.disabled=true;$("#gbx").classList.add("shake");msg.textContent="Wird geöffnet …";
   try{const ref=db.doc("geschenke/"+wk.id);const ex=await ref.get();if(ex.exists){openGift();return}
-    await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__"});const s=await ref.get();const g={id:wk.id,...(s.data()||{})};
+    const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+wk.id,{kontoId:k.id,name:k.name}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__"}),{won:true});if(!cl.won){openGift();return}
+    const s=await ref.get();const g={id:wk.id,...(s.data()||{})};
     if(g.kontoId!==k.id){openGift();return}
     if(!S.geschenke.some(x=>x.id===g.id))S.geschenke=[g,...S.geschenke];const a=giftAmt(g);
     await new Promise(r=>setTimeout(r,900));const bx=$("#gbx");bx.classList.remove("shake");bx.querySelector(".gv").textContent=money(a);bx.classList.add("open");confetti();$("#giftT").textContent="Geöffnet!";
@@ -1127,8 +1130,9 @@ const NEU_AB=new Date(2026,10,9).getTime();
 const abzBon=at=>at&&at<NEU_AB?(S.content?.abzBonus||[10000,25000,50000]):(S.content?.abzBonus2||[5000,10000,20000]);
 const abzAmt=(t,at)=>{const a=abzBon(at);return +a[{b:0,s:1,g:2}[t]]||0};
 let ABZU_C={k:"",m:{}};
-function abzUnlocks(){const key=[S.nachweise.length,S.wochen.length,S.konten.length,Object.keys(S.pruefung||{}).length,JSON.stringify(S.content?.abzBonus||""),JSON.stringify(S.content?.abzBonus2||"")].join("|");if(ABZU_C.k===key)return ABZU_C.m;
-  const m={},add=(kid,l,t,at)=>{if(!kid||!at||at<ABZ_START)return;const wid=weekOf(new Date(at)).id;(m[wid]=m[wid]||[]).push({kid,l,t,amt:abzAmt(t,at)})};
+function abzUnlocks(){const key=[S.nachweise.length,S.wochen.length,S.konten.length,Object.keys(S.pruefung||{}).length,JSON.stringify(S.wochen.map(w=>w.bezahltAbz||0)),JSON.stringify(S.content?.abzBonus||""),JSON.stringify(S.content?.abzBonus2||"")].join("|");if(ABZU_C.k===key)return ABZU_C.m;
+  const paidA={};S.wochen.forEach(w=>Object.entries(w.bezahltAbz||{}).forEach(([nk,ls])=>(ls||[]).forEach(l=>{(paidA[nk+"|"+l]=paidA[nk+"|"+l]||[]).push(w.id)})));
+  const m={},add=(kid,l,t,at)=>{if(!kid||!at||at<ABZ_START)return;const wid=weekOf(new Date(at)).id;const pw=paidA[String(konto(kid)?.name||kid).toLowerCase()+"|"+l];if(pw&&!pw.includes(wid))return;(m[wid]=m[wid]||[]).push({kid,l,t,amt:abzAmt(t,at)})};
   const li={};S.nachweise.filter(n=>statusOf(n)==="angenommen"&&n.zeit).sort((a,b)=>a.zeit-b.zeit).forEach(n=>{const c=li[n.kontoId]=(li[n.kontoId]||0)+1;
     if(c===10)add(n.kontoId,"Werber","b",n.zeit);if(c===50)add(n.kontoId,"Werbeprofi","s",n.zeit);if(c===100)add(n.kontoId,"LI-Legende","g",n.zeit)});
   const pr={},ein={};[...S.wochen].filter(w=>w.eintraege&&w.von).sort((a,b)=>a.von-b.von).forEach(w=>{const seen={};(w.eintraege||[]).forEach(e=>{const k=e.kontoId,o=seen[k]=seen[k]||{p:0,e:0};o.p+=(+e.erstellt||0)+(+e.bearbeitet||0);o.e+=+e.eingestellt||0});
@@ -1213,7 +1217,8 @@ const TDEF={erstellt:2000,bearbeitet:3000,eingestellt:3000,werbung:5000};
 const tarife=w=>({...TDEF,...(S.content?.tarife||{}),...((w&&w.tarife)||{})});
 const baseRow=(r,t)=>TARIF.reduce((s,[k])=>s+(+r[k]||0)*(+t[k]||0),0);
 const boostAmt=r=>(r.boost||[]).reduce((s,l)=>s+Object.entries(BOOSTU[l]||{}).reduce((a,[k,v])=>a+(+r[k]||0)*v,0),0);
-const sumRow=(r,t)=>baseRow(r,t)+boostAmt(r,t)+(+r.bonus||0);
+/* Einmal als ausgezahlt markiert, bleibt der Betrag dieser Woche fest */
+const sumRow=(r,t)=>r&&r.frozen!=null?+r.frozen:baseRow(r,t)+boostAmt(r,t)+(+r.bonus||0);
 const gMs=z=>typeof z==="number"?z:z&&typeof z.toMillis==="function"?z.toMillis():z&&z.seconds?z.seconds*1000+Math.floor((z.nanoseconds||0)/1e6):0;
 const PERK={"Glückspilz":5};
 const BOOSTU={"Werber":{werbung:250},"Werbeprofi":{werbung:500},"LI-Legende":{werbung:750},"Prüfer":{erstellt:150,bearbeitet:150},"Prüfungs-Ass":{erstellt:300,bearbeitet:300},"Recruiter":{eingestellt:300}};
@@ -1261,7 +1266,9 @@ async function doSecret(){if(secBusy)return;const wk=weekOf(),kid=meId(),k=konto
   if(!db){toast("Gerade keine Verbindung.");return}
   secBusy=true;try{const ref=db.doc("geschenke/"+secId(wk.id));const ex=await ref.get();
     if(ex.exists){const g=ex.data()||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller. Ab Montag versteckt sich ein neues Secret.</p>`);render();return}
-    await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__",art:"secret"});const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
+    const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name,art:"secret"}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__",art:"secret"}),{won:true});
+    if(!cl.won){const o=cl.data||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(o.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
+    const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
     if(g.kontoId!==k.id){secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     if(!S.geschenke.some(x=>x.id===g.id))S.geschenke=[g,...S.geschenke];const a=secAmt(g);
     try{await db.collection("log").add({zeit:Date.now(),text:`Secret der Woche gefunden von ${k.name} (+${money(a)})`,by:uid||""})}catch{}
@@ -1294,7 +1301,8 @@ function weekRows(w,wk=selWeek()){const dr=UI.draft&&UI.draft.wid===w.id,src=(dr
   abzOf&&(abzUnlocks()[wk.id]||[]).forEach(x=>{if(konto(x.kid)&&!aus.has(x.kid)&&!isAushilfe(x.kid)&&!by[x.kid]){const o={name:konto(x.kid).name,kontoId:x.kid};TARIF.forEach(([k])=>o[k]=0);by[x.kid]=o}});
   const base=Object.values(by);
   base.forEach(r=>{r.name=konto(r.kontoId).name;r.werbungAuto=liOf(r.kontoId,wk).length;r.werbung=r.werbungFix!=null?+r.werbungFix:r.werbungAuto;if(isLeitung(r.kontoId)){r.lead=true;TARIF.forEach(([k])=>{if(k!=="werbung")r[k]=0})}r.gift=gf&&gf.kontoId===r.kontoId?giftAmt(gf):0;r.secret=sf&&sf.kontoId===r.kontoId?secAmt(sf):0;r.abz=abzOf(r.kontoId,wk.id);r.bonus=r.gift+r.secret+r.abz.reduce((s,x)=>s+x.amt,0);r.boost=boostOf(r.kontoId,wk)});
-  return base.filter(r=>!r.lead||r.werbung>0||r.bonus>0||dr)}
+  const fz=w.bezahltBetrag||{},pd=w.bezahlt||{};base.forEach(r=>{if(pd[r.kontoId]&&fz[r.kontoId]!=null)r.frozen=+fz[r.kontoId]});
+  return base.filter(r=>!r.lead||r.werbung>0||r.bonus>0||r.frozen>0||dr)}
 function ensureDraft(){const wk=selWeek(),w=weekDoc(wk.id);if(!UI.draft||UI.draft.wid!==wk.id){const cur=weekRows(w,wk);UI.draft={wid:wk.id,aus:[...(w.aus||[])],rows:[]};UI.draft.rows=JSON.parse(JSON.stringify(cur.map(r=>{const o={name:r.name,kontoId:r.kontoId};TARIF.forEach(([k])=>{if(k!=="werbung")o[k]=+r[k]||0});if(r.werbungFix!=null)o.werbungFix=r.werbungFix;return o})))}return UI.draft}
 
 function periodBar(wk){const p=UI.per||"woche",o=UI.wo||0;
@@ -1404,10 +1412,10 @@ async function payoutAction(a,id){
   if(a==="draft-save"){const dd=ensureDraft();const rows=weekRows(w,wk).map(r=>{const o={name:konto(r.kontoId).name,kontoId:r.kontoId};TARIF.forEach(([k])=>o[k]=+r[k]||0);if(r.werbungFix!=null)o.werbungFix=+r.werbungFix;return o});
     const tt=w.eintraege&&w.tarife?w.tarife:{...TDEF,...(S.content?.tarife||{})},sum=rows.reduce((s,r)=>s+sumRow(r,tt),0);
     const bez={};rows.forEach(r=>{if(w.bezahlt&&w.bezahlt[r.kontoId])bez[r.kontoId]=true});
-    if(await write(()=>db.doc("wochen/"+wk.id).set({von:wk.von,bis:wk.bis,eintraege:rows,tarife:tt,bezahlt:bez,aus:dd.aus||[]}),`Auszahlung ${fmtDate(wk.von)}–${fmtDate(wk.bis)} gespeichert: ${rows.length} Mitarbeiter, ${money(sum)}`)){UI.draft=null;UI.scan=null;render();toast("Auszahlung gespeichert")}}
+    if(await write(()=>db.doc("wochen/"+wk.id).set({von:wk.von,bis:wk.bis,eintraege:rows,tarife:tt,bezahlt:bez,bezahltBetrag:w.bezahltBetrag||{},bezahltAbz:w.bezahltAbz||{},aus:dd.aus||[]}),`Auszahlung ${fmtDate(wk.von)}–${fmtDate(wk.bis)} gespeichert: ${rows.length} Mitarbeiter, ${money(sum)}`)){UI.draft=null;UI.scan=null;render();toast("Auszahlung gespeichert")}}
   if(a==="pay-copy"){const amt=amountOf(id);render();const ok=await copyText(payText(id,amt));toast(ok?"Nachricht kopiert":"Kopieren hat nicht geklappt.");if(!(konto(id)?.pass||konto(id)?.gameId))setTimeout(()=>toast(`Bei ${konto(id)?.name} fehlt noch der Reisepass in der Mitarbeiterliste.`),1600);return}
   if(a==="paid"&&!(w.bezahlt||{})[id]){const amt=amountOf(id);UI.copiedOk=await copyText(payText(id,amt))}
-  if(a==="paid"){const k=konto(id),v=!(w.bezahlt||{})[id],exists=S.wochen.some(x=>x.id===wk.id);if(await write(()=>exists?db.doc("wochen/"+wk.id).update({bezahlt:{[id]:v}}):db.doc("wochen/"+wk.id).set({von:wk.von,bis:wk.bis,bezahlt:{[id]:v}}),`${k?.name}: Auszahlung ${fmtDate(wk.von)}–${fmtDate(wk.bis)} als ${v?"ausgezahlt":"offen"} markiert`)){toast(v?`${k?.name} ausgezahlt${UI.copiedOk?" · Nachricht kopiert":""}`:`${k?.name} wieder offen`);if(v&&!(k?.pass||k?.gameId))setTimeout(()=>toast(`Bei ${k?.name} fehlt noch der Reisepass in der Mitarbeiterliste.`),1600);if(v&&!getPayer())setTimeout(()=>toast("Trag unten bei „Ausgegeben von“ deinen Namen ein."),3200)}}
+  if(a==="paid"){const k=konto(id),v=!(w.bezahlt||{})[id],exists=S.wochen.some(x=>x.id===wk.id),nk=String(k?.name||id).toLowerCase(),fr=v?amountOf(id):null,ab=v?abzOf(id,wk.id).map(x=>x.l):[];const pay={bezahlt:{[id]:v},bezahltBetrag:{[id]:fr},bezahltAbz:{[nk]:ab}};if(await write(()=>exists?db.doc("wochen/"+wk.id).update(pay):db.doc("wochen/"+wk.id).set({von:wk.von,bis:wk.bis,...pay}),`${k?.name}: Auszahlung ${fmtDate(wk.von)}–${fmtDate(wk.bis)} als ${v?"ausgezahlt":"offen"} markiert`)){toast(v?`${k?.name} ausgezahlt${UI.copiedOk?" · Nachricht kopiert":""}`:`${k?.name} wieder offen`);if(v&&!(k?.pass||k?.gameId))setTimeout(()=>toast(`Bei ${k?.name} fehlt noch der Reisepass in der Mitarbeiterliste.`),1600);if(v&&!getPayer())setTimeout(()=>toast("Trag unten bei „Ausgegeben von“ deinen Namen ein."),3200)}}
   if(a==="tarife-save"){const nt={};TARIF.forEach(([k])=>nt[k]=Math.max(0,+$("#tf-"+k).value||0));const ab=[0,1,2].map(i=>Math.max(0,+$("#ab-"+i)?.value||0));if(await saveContent({tarife:nt,abzBonus2:ab},`Auszahlungsbeträge geändert: ${TARIF.map(([k,l])=>`${l} ${money(nt[k])}`).join(", ")}`)){UI.edit.tarife=false;render();toast("Beträge gespeichert")}}
 }
 document.addEventListener("change",e=>{const f=e.target;if(!f.dataset||!f.dataset.cnt)return;{const w0=weekDoc(selWeek().id);if((w0.bezahlt||{})[f.dataset.id])setTimeout(()=>toast(`Betrag von ${konto(f.dataset.id)?.name} geändert. Mit dem Kopieren-Symbol die neue Nachricht holen.`),50)}const d=ensureDraft();let r=d.rows.find(x=>x.kontoId===f.dataset.id);if(!r){r={name:konto(f.dataset.id)?.name||"",kontoId:f.dataset.id};TARIF.forEach(([k])=>{if(k!=="werbung")r[k]=0});d.rows.push(r)}const v=Math.max(0,parseInt(f.value)||0);if(f.dataset.cnt==="werbung")r.werbungFix=v;else r[f.dataset.cnt]=v;f.defaultValue=f.value;clearTimeout(window.__cntT);window.__cntT=setTimeout(render,350)});
@@ -1493,6 +1501,10 @@ Antworte nur mit JSON: {"anzeige":true,"sender":"Vorname Nachname","datum":"TT.M
     const dm=String(r.datum||"").match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/),tm=String(r.uhrzeit||"").match(/(\d{1,2}):(\d{2})/);
     if(!dm||!tm){UI.li={err:"Datum oder Uhrzeit unten rechts sind nicht lesbar. Achte darauf, dass der Screenshot im Vollbild ist."};render();return}
     const d=new Date(+dm[3],+dm[2]-1,+dm[1],+tm[1],+tm[2]),ms=d.getTime();
+    const nw=new Date();if(isNaN(ms)){UI.li={err:"Datum oder Uhrzeit auf dem Screenshot sind ungültig."};render();return}
+    if(d.toDateString()!==nw.toDateString()){UI.li={err:`Der Screenshot ist vom ${dm[0]}. Es zählen nur Werbungen von heute.`};render();return}
+    if(ms>nw.getTime()+5*6e4){UI.li={err:"Die Uhrzeit auf dem Screenshot liegt in der Zukunft. Prüf die Uhrzeit unten rechts."};render();return}
+    if(ms<nw.getTime()-2*36e5){UI.li={err:`Der Screenshot ist von ${String(tm[1]).padStart(2,"0")}:${tm[2]} Uhr und damit älter als 2 Stunden. Lade Nachweise innerhalb von 2 Stunden nach dem Schalten hoch.`};render();return}
     if(isNaN(ms)||ms>Date.now()+36e5){UI.li={err:"Das Datum auf dem Screenshot liegt in der Zukunft oder ist ungültig."};render();return}
     const p=n=>String(n).padStart(2,"0"),slot=`li-${k.id}-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}`;
     if((S.nachweise||[]).some(n=>(n.slot||n.id)===slot&&statusOf(n)!=="abgelehnt")){UI.li={err:`${k.name} hat für ${p(d.getHours())}:00 bis ${p(d.getHours())}:59 Uhr am ${dm[0]} schon eine Werbung eingereicht. Es zählt nur eine pro Stunde.`};render();return}
