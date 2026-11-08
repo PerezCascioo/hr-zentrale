@@ -766,7 +766,7 @@ dialog.wset{width:min(980px,calc(100vw - 32px));height:min(720px,calc(100vh - 40
  window.HR={role:0,uid:null,owner:false,ready:false,admins:{},hasOwner:true,ai:null};
  const cache={},pend={};
  window.imgSrc=v=>{if(!v)return"";if(!String(v).startsWith("bild:"))return v;const id=v.slice(5);if(cache[id]!==undefined)return cache[id];
-   if(!pend[id]&&window.HR._getImg){pend[id]=1;window.HR._getImg(id).then(s=>{cache[id]=s||"";if(typeof render==="function")render()}).catch(()=>{cache[id]=""})}return""};
+   if(!pend[id]&&window.HR._getImg){pend[id]=1;window.HR._getImg(id).then(s=>{cache[id]=s||"";if(typeof renderSoon==="function")renderSoon();else if(typeof render==="function")render()}).catch(()=>{cache[id]=""})}return""};
  window.HR._setImg=(id,src)=>{cache[id]=src};
 })();
 </script>
@@ -1003,6 +1003,8 @@ function renderNav(){
 function page(tab,title,text,acts=""){const t=TABS_ALL.find(x=>x[0]===tab);return`<div class="crumb">${t[3]} <i>/</i> ${esc(t[1])}</div><div class="phead"><div><h1>${esc(title)}</h1>${text?`<p>${text}</p>`:""}</div>${acts?`<div class="acts">${acts}</div>`:""}</div>`}
 const editBtn=k=>writable()?`<button class="btn${UI.edit[k]?" pri":""}" data-edit="${k}">${svg(UI.edit[k]?"check":"edit")}${UI.edit[k]?"Fertig":"Bearbeiten"}</button>`:"";
 
+/* Mehrere Änderungen kurz hintereinander nur einmal zeichnen */
+let _rt=0;function renderSoon(){if(_rt)return;_rt=setTimeout(()=>{_rt=0;render()},80)}
 function render(){
   renderNav();if(typeof renderAuth==="function")renderAuth();
   const v=$("#view");
@@ -2099,7 +2101,7 @@ let h0=location.hash.slice(1);if(h0==="benutzer")h0="konten";if(h0==="hierarchie
 applyP();render();
 addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(TABS_ALL.some(t=>t[0]===h)&&h!==UI.tab){UI.tab=h;render()}});
 async function resolveNames(){if(!user)return;const ids=[...new Set([...S.log.map(x=>x.by),...Object.values(S.pruefung).map(p=>p.by)].filter(x=>x&&x!=="auto"))].filter(i=>!(i in names));if(!ids.length)return;
-  try{const ps=await user.profiles(ids);ids.forEach(i=>names[i]=ps?.[i]?.name||"Jemand");if(["protokoll","ueberblick","nachweise"].includes(UI.tab))render()}catch{}}
+  try{const ps=await user.profiles(ids);ids.forEach(i=>names[i]=ps?.[i]?.name||"Jemand");if(["protokoll","ueberblick","nachweise"].includes(UI.tab))renderSoon()}catch{}}
 function setLive(on,txt){$("#live").className="live"+(on?" on":"");$("#liveM").className="live"+(on?" on":"");$("#liveTxt").textContent=txt}
 
 (async()=>{
@@ -2117,10 +2119,10 @@ function setLive(on,txt){$("#live").className="live"+(on?" on":"");$("#liveM").c
   const onErr=()=>setLive(false,"Getrennt");
   const editing=()=>UI.edit.zeiten||UI.edit.richtlinien||UI.edit.kleidung||UI.edit.werbung||UI.edit.praemien||UI.edit.tarife;
   const busy=()=>{const a=document.activeElement;return a&&a.matches("input,textarea,select")&&!a.closest("dialog")&&a.id!=="q"};
-  db.doc("hr/content").onSnapshot(s=>{S.content=s.exists?s.data():{};if(!s.metadata.fromCache){clearTimeout(timer);live=true;setLive(true,"Online · live")}if(!editing())render()},onErr);
-  const list=(key,q)=>q.onSnapshot(s=>{S[key]=s.docs.map(d=>({id:d.id,...d.data()}));if(key==="log")resolveNames();if(key==="geschenke")giftReady();if(!busy())render()},onErr);
+  let lastC="";db.doc("hr/content").onSnapshot(s=>{const d=s.exists?s.data():{},j=JSON.stringify(d);const ch=j!==lastC;lastC=j;S.content=d;if(!s.metadata.fromCache&&!live){clearTimeout(timer);live=true;setLive(true,"Online · live");if(!editing())renderSoon();return}if(ch&&!editing())renderSoon()},onErr);
+  const list=(key,q)=>q.onSnapshot(s=>{S[key]=s.docs.map(d=>({id:d.id,...d.data()}));if(key==="log")resolveNames();if(key==="geschenke")giftReady();if(!busy())renderSoon()},onErr);
   list("konten",db.collection("konten"));list("plaetze",db.collection("plaetze"));list("wochen",db.collection("wochen"));list("nachweise",db.collection("nachweise").orderBy("zeit","desc").limit(1000));
-  db.collection("pruefung").onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.pruefung=m;resolveNames();if(!busy())render()},onErr);
+  db.collection("pruefung").onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.pruefung=m;resolveNames();if(!busy())renderSoon()},onErr);
   if(UI.admin)list("log",db.collection("log").orderBy("zeit","desc").limit(200));
   if(UI.admin)list("feedback",db.collection("feedback").orderBy("zeit","desc").limit(300));
   list("geschenke",db.collection("geschenke").orderBy("zeit","desc").limit(80));
