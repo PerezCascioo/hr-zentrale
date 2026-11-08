@@ -1059,12 +1059,12 @@ function giftReady(){const el=$("#xgifts");if(el)el.classList.toggle("ready",!gi
 function confetti(){const c=document.createElement("div");c.className="conf";const C=["#ffd34d","#e8364f","#4de08a","#5bb4ff","#fff","#ff8a3d"];
   c.innerHTML=Array.from({length:90},(_,i)=>`<i style="left:${Math.random()*100}vw;background:${C[i%6]};--x:${(Math.random()-.5)*30}vw;--r:${Math.random()*900}deg;--t:${2.2+Math.random()*1.8}s;--d:${Math.random()*.6}s"></i>`).join("");document.body.appendChild(c);setTimeout(()=>c.remove(),5200)}
 function openGift(){const wk=weekOf(),g=giftOf(wk.id),b=$("#giftBody");const fd=x=>new Date(x).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
-  const head=`<header><div><div class="eyebrow">Geschenk der Woche · ${fd(wk.von)} – ${fd(wk.bis)}</div><h2 id="giftT">${g?"Schon geöffnet":"Ein Geschenk für dich?"}</h2><p>${g?"Jede Woche liegt ein neues Geschenk unter dem Baum. Nur wer es zuerst öffnet, bekommt den Inhalt.":"Wer es diese Woche zuerst öffnet, bekommt zwischen $10.000 und $75.000 zur Auszahlung dazu, mit Abzeichen sogar mehr."}</p></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header>`;
+  const head=`<header><div><div class="eyebrow">Geschenk der Woche · ${fd(wk.von)} – ${fd(wk.bis)}</div><h2 id="giftT">${g?"Schon geöffnet":"Ein Geschenk für dich?"}</h2><p>${g?"Jede Woche liegt ein neues Geschenk unter dem Baum. Nur wer es zuerst öffnet, bekommt den Inhalt.":(Date.now()>=NEU_AB?"Wer es diese Woche zuerst öffnet, bekommt zwischen $10.000 und $50.000 zur Auszahlung dazu.":"Wer es diese Woche zuerst öffnet, bekommt zwischen $10.000 und $75.000 zur Auszahlung dazu, mit Abzeichen sogar mehr.")}</p></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header>`;
   if(g){const a=giftAmt(g);b.innerHTML=head+`<div class="gbox open"><div class="gb"></div><div class="gv num">${a?money(a):"…"}</div></div><p style="text-align:center;margin:6px 0 2px"><b>${esc(g.name)}</b> war diese Woche schneller.</p>${perkTxt(g.kontoId,gMs(g.zeit))?`<p class="hint" style="text-align:center;color:#f4c95d">${esc(perkTxt(g.kontoId,gMs(g.zeit)))}</p>`:""}<p class="hint" style="text-align:center">Nächste Woche gibt es ein neues Geschenk.</p>`}
   else b.innerHTML=head+`<div class="gbox" id="gbx"><div class="gb"></div><div class="gl"></div><div class="bow"></div><div class="gv num"></div></div>
     <label class="f" for="gName">Wer bist du?<select class="i" id="gName"><option value="">Name auswählen …</option>${sortedKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${k.id===meId()?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     <span class="hint" id="gPerk"></span><span class="status" id="gMsg"></span><button class="btn pri block" data-gift-open>${svg("star")}Geschenk öffnen</button>`;
-  const gp=$("#gPerk");if(gp){const upd=()=>{const p=giftPerks($("#gName").value,Date.now()),pc=p.reduce((s,x)=>s+x[1],0);gp.innerHTML=pc?`<span style="color:#f4c95d">Deine Abzeichen geben dir <b>+${pc} %</b> aufs Geschenk (${p.map(x=>x[0]).join(", ")}).</span>`:"Mit Abzeichen wie Glückspilz gibt es mehr Geld aus dem Geschenk."};upd();$("#gName").onchange=upd}
+  const gp=$("#gPerk");if(gp){const upd=()=>{const p=giftPerks($("#gName").value,Date.now()),pc=p.reduce((s,x)=>s+x[1],0);gp.innerHTML=pc?`<span style="color:#f4c95d">Deine Abzeichen geben dir <b>+${pc} %</b> aufs Geschenk (${p.map(x=>x[0]).join(", ")}).</span>`:""};upd();$("#gName").onchange=upd}
   const d=$("#giftDlg");if(!d.open)d.showModal()}
 async function doGift(){const kid=$("#gName").value,k=konto(kid),wk=weekOf(),msg=$("#gMsg");if(!k){msg.textContent="Wähle zuerst deinen Namen aus.";return}
   const bt=$("[data-gift-open]");bt.disabled=true;$("#gbx").classList.add("shake");msg.textContent="Wird geöffnet …";
@@ -1096,7 +1096,6 @@ function badgesOf(kid){const k=konto(kid);if(!k)return[];const s=badgeStats()[ki
   if(s.li>=100)out.push(["mega","LI-Legende","g",`${s.li} Lifeinvader-Werbungen`]);else if(s.li>=50)out.push(["mega","Werbeprofi","s",`${s.li} Lifeinvader-Werbungen (ab 100: LI-Legende)`]);else if(s.li>=10)out.push(["mega","Werber","b",`${s.li} Lifeinvader-Werbungen (ab 50: Werbeprofi)`]);
   if(s.pr>=100)out.push(["check","Prüfungs-Ass","g",`${s.pr} Prüfungen erstellt oder bearbeitet`]);else if(s.pr>=25)out.push(["check","Prüfer","s",`${s.pr} Prüfungen erstellt oder bearbeitet (ab 100: Prüfungs-Ass)`]);
   if(s.ein>=10)out.push(["userplus","Recruiter","s",`${s.ein} Mitarbeiter eingestellt`]);
-  if(s.gift)out.push(["coin",`Glückspilz${s.gift>1?" ×"+s.gift:""}`,"g",`${s.gift}× das Geschenk der Woche gewonnen`]);
   const d=k.angelegt?(Date.now()-k.angelegt)/864e5:0;
   if(d>=365)out.push(["clock","1 Jahr dabei","g","Seit über einem Jahr in der HR"]);else if(d>=182)out.push(["clock","6 Monate dabei","s","Seit über 6 Monaten in der HR"]);else if(d>=91)out.push(["clock","3 Monate dabei","b","Seit über 3 Monaten in der HR"]);else if(d>=30)out.push(["clock","1 Monat dabei","b","Seit über einem Monat in der HR"]);
   return out}
@@ -1104,13 +1103,16 @@ const badgeChip=([ic,l,t,tip])=>`<span class="abz" style="--c:${TIER[t]}" title=
 function abzKatalog(kid){const k=kid&&konto(kid),s=(k&&badgeStats()[kid])||{li:0,pr:0,ein:0,top:0,gift:0},d=k&&k.angelegt?Math.floor((Date.now()-k.angelegt)/864e5):0;
   return[["Lifeinvader",[["mega","Werber","b","10 angenommene LI-Werbungen",s.li,10],["mega","Werbeprofi","s","50 angenommene LI-Werbungen",s.li,50],["mega","LI-Legende","g","100 angenommene LI-Werbungen",s.li,100]]],
    ["Prüfungen & Einstellungen",[["check","Prüfer","s","25 Prüfungen erstellt oder bearbeitet",s.pr,25],["check","Prüfungs-Ass","g","100 Prüfungen erstellt oder bearbeitet",s.pr,100],["userplus","Recruiter","s","10 Mitarbeiter eingestellt",s.ein,10]]],
-   ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung einer abgeschlossenen Woche",s.top,1,s.top>1?"×"+s.top:""],["coin","Glückspilz","g","Geschenk der Woche als Erster geöffnet",s.gift,1,s.gift>1?"×"+s.gift:""]]],
+   ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung einer abgeschlossenen Woche",s.top,1,s.top>1?"×"+s.top:""]]],
    ["Treue",[["clock","1 Monat dabei","b","30 Tage in der HR",d,30],["clock","3 Monate dabei","b","91 Tage in der HR",d,91],["clock","6 Monate dabei","s","182 Tage in der HR",d,182],["clock","1 Jahr dabei","g","365 Tage in der HR",d,365]]]]}
 const ABZ_START=new Date(2026,10,2).getTime();
-const abzAmt=t=>{const a=S.content?.abzBonus||[10000,25000,50000];return +a[{b:0,s:1,g:2}[t]]||0};
+/* Ab Montag 09.11.2026: Geschenk 10k–50k ohne Glückspilz, niedrigerer Abzeichen-Bonus. Ältere Wochen bleiben unverändert. */
+const NEU_AB=new Date(2026,10,9).getTime();
+const abzBon=at=>at&&at<NEU_AB?(S.content?.abzBonus||[10000,25000,50000]):(S.content?.abzBonus2||[5000,10000,20000]);
+const abzAmt=(t,at)=>{const a=abzBon(at);return +a[{b:0,s:1,g:2}[t]]||0};
 let ABZU_C={k:"",m:{}};
-function abzUnlocks(){const key=[S.nachweise.length,S.wochen.length,S.konten.length,Object.keys(S.pruefung||{}).length,JSON.stringify(S.content?.abzBonus||"")].join("|");if(ABZU_C.k===key)return ABZU_C.m;
-  const m={},add=(kid,l,t,at)=>{if(!kid||!at||at<ABZ_START)return;const wid=weekOf(new Date(at)).id;(m[wid]=m[wid]||[]).push({kid,l,t,amt:abzAmt(t)})};
+function abzUnlocks(){const key=[S.nachweise.length,S.wochen.length,S.konten.length,Object.keys(S.pruefung||{}).length,JSON.stringify(S.content?.abzBonus||""),JSON.stringify(S.content?.abzBonus2||"")].join("|");if(ABZU_C.k===key)return ABZU_C.m;
+  const m={},add=(kid,l,t,at)=>{if(!kid||!at||at<ABZ_START)return;const wid=weekOf(new Date(at)).id;(m[wid]=m[wid]||[]).push({kid,l,t,amt:abzAmt(t,at)})};
   const li={};S.nachweise.filter(n=>statusOf(n)==="angenommen"&&n.zeit).sort((a,b)=>a.zeit-b.zeit).forEach(n=>{const c=li[n.kontoId]=(li[n.kontoId]||0)+1;
     if(c===10)add(n.kontoId,"Werber","b",n.zeit);if(c===50)add(n.kontoId,"Werbeprofi","s",n.zeit);if(c===100)add(n.kontoId,"LI-Legende","g",n.zeit)});
   const pr={},ein={};[...S.wochen].filter(w=>w.eintraege&&w.von).sort((a,b)=>a.von-b.von).forEach(w=>{const seen={};(w.eintraege||[]).forEach(e=>{const k=e.kontoId,o=seen[k]=seen[k]||{p:0,e:0};o.p+=(+e.erstellt||0)+(+e.bearbeitet||0);o.e+=+e.eingestellt||0});
@@ -1210,12 +1212,12 @@ function boostOf(kid,wk){const k=konto(kid);if(!k||!wk||wk.von<ABZ_START)return[
   if(pr>=100)out.push(["Prüfungs-Ass","g"]);else if(pr>=25)out.push(["Prüfer","s"]);
   if(ein>=10)out.push(["Recruiter","s"]);
   return BOOST_C.m[ck]=out.map(([l])=>l)}
-function giftPerks(kid,ms){const k=konto(kid);if(!k||!ms||ms<ABZ_START)return[];const out=[];
+function giftPerks(kid,ms){const k=konto(kid);if(!k||!ms||ms<ABZ_START||ms>=NEU_AB)return[];const out=[];
   if((S.geschenke||[]).some(x=>x.kontoId===kid&&gMs(x.zeit)&&gMs(x.zeit)<ms&&x.id!==weekOf(new Date(ms)).id))out.push(["Glückspilz",PERK["Glückspilz"]]);
   const li=S.nachweise.filter(n=>n.kontoId===kid&&n.zeit&&n.zeit<ms&&statusOf(n)==="angenommen").length;if(li>=100)out.push(["LI-Legende",PERK["LI-Legende"]]);else if(li>=50)out.push(["Werbeprofi",PERK["Werbeprofi"]]);
   if(k.angelegt&&k.angelegt+365*864e5<ms)out.push(["1 Jahr dabei",PERK["1 Jahr dabei"]]);return out}
-const giftBase=ms=>10000+(ms%66)*1000;
-const giftAmt=g=>{const ms=gMs(g&&g.zeit);if(!ms)return 0;const pc=giftPerks(g.kontoId,ms).reduce((s,x)=>s+x[1],0);return Math.round(giftBase(ms)*(1+pc/100)/1000)*1000};
+const giftBase=ms=>ms>=NEU_AB?10000+(ms%41)*1000:10000+(ms%66)*1000;
+const giftAmt=g=>{const ms=gMs(g&&g.zeit);if(!ms)return 0;const pc=giftPerks(g.kontoId,ms).reduce((s,x)=>s+(+x[1]||0),0);return Math.round(giftBase(ms)*(1+pc/100)/1000)*1000};
 const perkTxt=(kid,ms)=>{const p=giftPerks(kid,ms);return p.length?`inkl. ${p.map(x=>`+${x[1]} % ${x[0]}`).join(", ")}`:""};
 const giftOf=wid=>(S.geschenke||[]).find(g=>g.id===wid);
 let sample=null,sampleOK=false;
@@ -1279,7 +1281,7 @@ function vAuszahlungen(){
   return page("auszahlungen","Auszahlungen",`Jede Tätigkeit wird einzeln bezahlt. Lifeinvader-Werbung bekommt jeder bezahlt. Für alles andere bekommt die Leitung nichts. Aushilfen bekommen keine Auszahlung.`,editBtn("tarife"))+periodBar(wk)+
   `<div class="g g4">${TARIF.map(([k,l,ic])=>`<div class="card rulebox"><span class="ic">${svg(ic)}</span><div style="min-width:0"><b>${l}</b>${ed?`<input class="i num" id="tf-${k}" type="number" min="0" step="500" value="${t[k]}" style="max-width:120px;margin-top:4px;padding:6px 10px" aria-label="Betrag ${l}">`:`<span class="num" style="color:var(--acc);font-weight:700;font-size:13px">${money(t[k])}</span>`}${k==="werbung"?`<span style="display:block">höchstens 1 pro Stunde</span>`:`<span style="display:block">pro Mal</span>`}</div></div>`).join("")}</div>
   ${ed?`<div class="row" style="margin-top:12px"><button class="btn pri" data-act="tarife-save">${svg("check")}Beträge speichern</button><span class="hint" style="flex:1">Gilt ab der nächsten gespeicherten Woche. Gespeicherte Wochen behalten ihre Beträge.</span></div>`:""}
-  ${(()=>{const a=c.abzBonus||[10000,25000,50000];return`<div class="card abzbonline"><span class="ic">${svg("star")}</span><div style="flex:1;min-width:0"><b>Abzeichen-Bonus</b><span style="display:block">Einmalig, wenn jemand ein Abzeichen freischaltet. Kommt automatisch in die Auszahlung dieser Woche.</span></div>
+  ${(()=>{const a=c.abzBonus2||[5000,10000,20000];return`<div class="card abzbonline"><span class="ic">${svg("star")}</span><div style="flex:1;min-width:0"><b>Abzeichen-Bonus</b><span style="display:block">Einmalig, wenn jemand ein Abzeichen freischaltet. Kommt automatisch in die Auszahlung dieser Woche.</span></div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">${["Bronze","Silber","Gold"].map((n,i)=>`<span class="abzbt" style="--c:${TIER["bsg"[i]]}">${n} ${ed?`<input class="i num" id="ab-${i}" type="number" min="0" step="1000" value="${+a[i]||0}" style="width:100px;padding:5px 8px" aria-label="Bonus ${n}">`:`<b>${money(+a[i]||0)}</b>`}</span>`).join("")}</div></div>`})()}
   <div class="g g3" style="margin-top:14px">
    <div class="card kpi"><div class="top"><span class="lab">Auszahlung ${weekLabel(UI.wo||0).toLowerCase()}</span><span class="ic">${svg("coin")}</span></div><div class="v num">${money(total)}</div><div class="sub">${dr?"Noch nicht gespeichert":saved?"Gespeichert":"Noch nichts eingetragen"}</div></div>
@@ -1356,7 +1358,7 @@ async function payoutAction(a,id){
   if(a==="pay-copy"){const amt=amountOf(id);render();const ok=await copyText(payText(id,amt));toast(ok?"Nachricht kopiert":"Kopieren hat nicht geklappt.");if(!(konto(id)?.pass||konto(id)?.gameId))setTimeout(()=>toast(`Bei ${konto(id)?.name} fehlt noch der Reisepass in der Mitarbeiterliste.`),1600);return}
   if(a==="paid"&&!(w.bezahlt||{})[id]){const amt=amountOf(id);UI.copiedOk=await copyText(payText(id,amt))}
   if(a==="paid"){const k=konto(id),v=!(w.bezahlt||{})[id],exists=S.wochen.some(x=>x.id===wk.id);if(await write(()=>exists?db.doc("wochen/"+wk.id).update({bezahlt:{[id]:v}}):db.doc("wochen/"+wk.id).set({von:wk.von,bis:wk.bis,bezahlt:{[id]:v}}),`${k?.name}: Auszahlung ${fmtDate(wk.von)}–${fmtDate(wk.bis)} als ${v?"ausgezahlt":"offen"} markiert`)){toast(v?`${k?.name} ausgezahlt${UI.copiedOk?" · Nachricht kopiert":""}`:`${k?.name} wieder offen`);if(v&&!(k?.pass||k?.gameId))setTimeout(()=>toast(`Bei ${k?.name} fehlt noch der Reisepass in der Mitarbeiterliste.`),1600);if(v&&!getPayer())setTimeout(()=>toast("Trag unten bei „Ausgegeben von“ deinen Namen ein."),3200)}}
-  if(a==="tarife-save"){const nt={};TARIF.forEach(([k])=>nt[k]=Math.max(0,+$("#tf-"+k).value||0));const ab=[0,1,2].map(i=>Math.max(0,+$("#ab-"+i)?.value||0));if(await saveContent({tarife:nt,abzBonus:ab},`Auszahlungsbeträge geändert: ${TARIF.map(([k,l])=>`${l} ${money(nt[k])}`).join(", ")}`)){UI.edit.tarife=false;render();toast("Beträge gespeichert")}}
+  if(a==="tarife-save"){const nt={};TARIF.forEach(([k])=>nt[k]=Math.max(0,+$("#tf-"+k).value||0));const ab=[0,1,2].map(i=>Math.max(0,+$("#ab-"+i)?.value||0));if(await saveContent({tarife:nt,abzBonus2:ab},`Auszahlungsbeträge geändert: ${TARIF.map(([k,l])=>`${l} ${money(nt[k])}`).join(", ")}`)){UI.edit.tarife=false;render();toast("Beträge gespeichert")}}
 }
 document.addEventListener("change",e=>{const f=e.target;if(!f.dataset||!f.dataset.cnt)return;{const w0=weekDoc(selWeek().id);if((w0.bezahlt||{})[f.dataset.id])setTimeout(()=>toast(`Betrag von ${konto(f.dataset.id)?.name} geändert. Mit dem Kopieren-Symbol die neue Nachricht holen.`),50)}const d=ensureDraft();let r=d.rows.find(x=>x.kontoId===f.dataset.id);if(!r){r={name:konto(f.dataset.id)?.name||"",kontoId:f.dataset.id};TARIF.forEach(([k])=>{if(k!=="werbung")r[k]=0});d.rows.push(r)}const v=Math.max(0,parseInt(f.value)||0);if(f.dataset.cnt==="werbung")r.werbungFix=v;else r[f.dataset.cnt]=v;f.defaultValue=f.value;clearTimeout(window.__cntT);window.__cntT=setTimeout(render,350)});
 
