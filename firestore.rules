@@ -1,0 +1,115 @@
+rules_version = '2';
+// Firestore-Regeln für HR Zentral (Projekt hr-dashboardll).
+// Diese Datei ist nur eine Kopie zum Nachschlagen. Wirksam sind die Regeln erst,
+// wenn sie in der Firebase-Konsole unter Firestore Database → Regeln eingefügt und veröffentlicht werden.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function ownerDoc() { return /databases/$(database)/documents/meta/owner; }
+    function isLeitung() {
+      return request.auth != null && exists(ownerDoc()) && get(ownerDoc()).data.uid == request.auth.uid;
+    }
+    function wStart(wid) { return timestamp.date(int(wid.split('-')[1]), int(wid.split('-')[2]), int(wid.split('-')[3])); }
+    function nachweis(id) { return /databases/$(database)/documents/nachweise/$(id); }
+    function nowMs() { return request.time.toMillis(); }
+
+    match /meta/owner {
+      allow read: if true;
+      allow create: if request.auth != null && !exists(ownerDoc()) && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /config/{d} {
+      allow read, write: if isLeitung();
+    }
+
+    // Protokoll: lesen nur Leitung. Einträge anlegen darf jeder (z. B. „Secret gefunden“, „Nachweis eingereicht“),
+    // aber nur kurze Texte und nie ändern oder löschen.
+    match /log/{id} {
+      allow read, update, delete: if isLeitung();
+      allow create: if isLeitung() || (
+        request.resource.data.keys().hasOnly(['zeit','text','by'])
+        && request.resource.data.text is string && request.resource.data.text.size() < 300
+        && request.resource.data.zeit is number
+        && request.resource.data.zeit > nowMs() - 600000 && request.resource.data.zeit < nowMs() + 600000);
+    }
+
+    match /data/users/{uid}/{rest=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // LI-Nachweise: nur für eingetragene Mitarbeiter, Screenshot höchstens 2 Stunden alt,
+    // Dokument-ID muss zum Mitarbeiter passen (li-<konto>-<JJJJMMTTHH>).
+    match /nachweise/{id} {
+      allow read: if true;
+      allow create: if isLeitung() || (
+        exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
+        && request.resource.data.keys().hasOnly(['kontoId','name','bild','eingereicht','zeit','datum','uhrzeit','ki','slot','by'])
+        && id.matches('li-' + request.resource.data.kontoId + '-[0-9]{10}(-[0-9]+)?')
+        && request.resource.data.bild is string && request.resource.data.bild.size() < 200
+        && request.resource.data.name is string && request.resource.data.name.size() < 80
+        && request.resource.data.zeit is number
+        && request.resource.data.zeit > nowMs() - 7500000
+        && request.resource.data.zeit < nowMs() + 600000
+        && (!('ki' in request.resource.data) || request.resource.data.ki is map)
+        && (!('slot' in request.resource.data) || (request.resource.data.slot is string && request.resource.data.slot.size() < 80)));
+      allow update, delete: if isLeitung();
+    }
+
+    // Automatisch annehmen nur für den ersten Nachweis pro Stunde (ID ohne Zusatz) und nur frische Screenshots.
+    match /pruefung/{id} {
+      allow read: if true;
+      allow create: if isLeitung() || (
+        request.resource.data.keys().hasOnly(['status','grund','by','zeit'])
+        && request.resource.data.status == 'angenommen'
+        && request.resource.data.by == 'auto'
+        && id.matches('li-[A-Za-z0-9_]+-[0-9]{10}')
+        && exists(nachweis(id))
+        && get(nachweis(id)).data.get('ki', {}).get('ok', false) == true
+        && get(nachweis(id)).data.zeit > nowMs() - 7500000);
+      allow update, delete: if isLeitung();
+    }
+
+    match /feedback/{id} {
+      allow read: if isLeitung();
+      allow create: if request.resource.data.keys().hasOnly(['name','kontoId','art','text','zeit'])
+        && request.resource.data.art in ['vorschlag','feedback','problem']
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+        && request.resource.data.name is string && request.resource.data.name.size() < 80
+        && request.resource.data.kontoId is string && request.resource.data.kontoId.size() < 80
+        && request.resource.data.zeit is number;
+      allow update, delete: if isLeitung();
+    }
+
+    // Geschenk (w-JJJJ-MM-TT) und Secret der Woche (secret-w-JJJJ-MM-TT):
+    // nur einmal anlegen, nur in der eigenen Woche, danach von niemandem ausser der Leitung änderbar.
+    match /geschenke/{wid} {
+      allow read: if true;
+      allow create: if wid.matches('(secret-)?w-[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && request.resource.data.keys().hasOnly(['kontoId','name','zeit'])
+        && request.resource.data.zeit == request.time
+        && request.resource.data.name is string && request.resource.data.name.size() < 80
+        && request.resource.data.kontoId is string
+        && exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
+        && request.time >= wStart(wid.replace('secret-', '')) - duration.value(2, 'h')
+        && request.time < wStart(wid.replace('secret-', '')) + duration.value(7, 'd');
+      allow update, delete: if isLeitung();
+    }
+
+    // Bilder: anlegen darf jeder. Profilbilder (pp-<konto>) darf jeder auch ersetzen oder entfernen.
+    match /bilder/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['src','zeit'])
+        && request.resource.data.src is string && request.resource.data.src.size() < 1000000;
+      allow update: if isLeitung() || (id.matches('pp-.+')
+        && request.resource.data.keys().hasOnly(['src','zeit'])
+        && request.resource.data.src is string && request.resource.data.src.size() < 1000000);
+      allow delete: if isLeitung() || id.matches('pp-.+');
+    }
+
+    match /{coll}/{id} {
+      allow read: if !(coll in ['config','log','feedback']);
+      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke']);
+    }
+  }
+}

@@ -1266,7 +1266,7 @@ async function doSecret(){if(secBusy)return;const wk=weekOf(),kid=meId(),k=konto
   if(!db){toast("Gerade keine Verbindung.");return}
   secBusy=true;try{const ref=db.doc("geschenke/"+secId(wk.id));const ex=await ref.get();
     if(ex.exists){const g=ex.data()||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller. Ab Montag versteckt sich ein neues Secret.</p>`);render();return}
-    const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name,art:"secret"}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__",art:"secret"}),{won:true});
+    const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__"}),{won:true});
     if(!cl.won){const o=cl.data||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(o.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
     if(g.kontoId!==k.id){secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
