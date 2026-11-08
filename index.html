@@ -1100,12 +1100,15 @@ function badgeStats(){const key=[S.nachweise.length,S.wochen.length,(S.geschenke
   const m={};const g=kid=>m[kid]||(m[kid]={li:0,pr:0,ein:0,top:0,gift:0});
   for(const n of S.nachweise)if(statusOf(n)==="angenommen")g(n.kontoId).li++;
   const now=Date.now();
+  const wins=[];
   for(const w of S.wochen){(w.eintraege||[]).forEach(e=>{const o=g(e.kontoId);o.pr+=(+e.erstellt||0)+(+e.bearbeitet||0);o.ein+=+e.eingestellt||0});
-    if(w.eintraege&&w.bis&&w.bis<now){const wk={id:w.id,von:w.von,bis:w.bis},t=tarife(w);const rs=weekRows(w,wk).map(r=>({k:r.kontoId,s:baseRow(r,t)})).filter(r=>r.s>0).sort((a,b)=>b.s-a.s);if(rs[0])g(rs[0].k).top++}}
+    if(w.eintraege&&w.bis&&w.bis<now){const wk={id:w.id,von:w.von,bis:w.bis},t=tarife(w);const rs=weekRows(w,wk).map(r=>({k:r.kontoId,s:baseRow(r,t)})).filter(r=>r.s>0).sort((a,b)=>b.s-a.s);if(rs[0])wins.push({von:w.von,k:rs[0].k})}}
+  /* Wochensieger: nur der Sieger der letzten abgeschlossenen Woche hat das Abzeichen, ×N = so viele Wochen in Folge */
+  wins.sort((a,b)=>b.von-a.von);if(wins[0]){let n=0;for(const x of wins){if(x.k!==wins[0].k)break;n++}g(wins[0].k).top=n}
   for(const x of S.geschenke||[])if(!isSec(x))g(x.kontoId).gift++;
   BADGE_C={k:key,m};return m}
 function badgesOf(kid){const k=konto(kid);if(!k)return[];const s=badgeStats()[kid]||{li:0,pr:0,ein:0,top:0,gift:0},out=[];
-  if(s.top)out.push(["star",`Wochensieger${s.top>1?" ×"+s.top:""}`,"g",`${s.top}× die höchste Auszahlung einer Woche`]);
+  if(s.top)out.push(["star",`Wochensieger${s.top>1?" ×"+s.top:""}`,"g",s.top>1?`Aktueller Wochensieger, ${s.top} Wochen in Folge`:"Aktueller Wochensieger der letzten Woche"]);
   if(s.li>=100)out.push(["mega","LI-Legende","g",`${s.li} Lifeinvader-Werbungen`]);else if(s.li>=50)out.push(["mega","Werbeprofi","s",`${s.li} Lifeinvader-Werbungen (ab 100: LI-Legende)`]);else if(s.li>=10)out.push(["mega","Werber","b",`${s.li} Lifeinvader-Werbungen (ab 50: Werbeprofi)`]);
   if(s.pr>=100)out.push(["check","Prüfungs-Ass","g",`${s.pr} Prüfungen erstellt oder bearbeitet`]);else if(s.pr>=25)out.push(["check","Prüfer","s",`${s.pr} Prüfungen erstellt oder bearbeitet (ab 100: Prüfungs-Ass)`]);
   if(s.ein>=10)out.push(["userplus","Recruiter","s",`${s.ein} Mitarbeiter eingestellt`]);
@@ -1116,7 +1119,7 @@ const badgeChip=([ic,l,t,tip])=>`<span class="abz" style="--c:${TIER[t]}" title=
 function abzKatalog(kid){const k=kid&&konto(kid),s=(k&&badgeStats()[kid])||{li:0,pr:0,ein:0,top:0,gift:0},d=k&&k.angelegt?Math.floor((Date.now()-k.angelegt)/864e5):0;
   return[["Lifeinvader",[["mega","Werber","b","10 angenommene LI-Werbungen",s.li,10],["mega","Werbeprofi","s","50 angenommene LI-Werbungen",s.li,50],["mega","LI-Legende","g","100 angenommene LI-Werbungen",s.li,100]]],
    ["Prüfungen & Einstellungen",[["check","Prüfer","s","25 Prüfungen erstellt oder bearbeitet",s.pr,25],["check","Prüfungs-Ass","g","100 Prüfungen erstellt oder bearbeitet",s.pr,100],["userplus","Recruiter","s","10 Mitarbeiter eingestellt",s.ein,10]]],
-   ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung einer abgeschlossenen Woche",s.top,1,s.top>1?"×"+s.top:""]]],
+   ["Besonderes",[["star","Wochensieger","g","Höchste Auszahlung der letzten Woche. Gibt es nur einmal: Wer nächste Woche vorne liegt, übernimmt es.",s.top,1,s.top>1?"×"+s.top+" in Folge":""]]],
    ["Treue",[["clock","1 Monat dabei","b","30 Tage in der HR",d,30],["clock","3 Monate dabei","b","91 Tage in der HR",d,91],["clock","6 Monate dabei","s","182 Tage in der HR",d,182],["clock","1 Jahr dabei","g","365 Tage in der HR",d,365]]]]}
 const ABZ_START=new Date(2026,10,2).getTime();
 /* Ab Montag 09.11.2026: Geschenk 10k–50k ohne Glückspilz, niedrigerer Abzeichen-Bonus. Ältere Wochen bleiben unverändert. */
