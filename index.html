@@ -1525,15 +1525,24 @@ async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;UI.
       UI.liOcr=r;const why=!r.anzeige?"Unsere Anzeige wurde oben links nicht erkannt.":r.senders&&r.senders.length&&!r.senders.includes(k.name)?`Unter eurer Anzeige steht ${r.senders.map(x=>"„"+x+"“").join(" und ")}, nicht ${k.name}. Jeder reicht nur seine eigene Anzeige ein.`:"";
       if(why){UI.liFile=file;UI.li={err:why+" Prüfe den Screenshot. Wenn er stimmt, kannst du ihn trotzdem einreichen, die Leitung schaut ihn sich dann an.",force:true};render();return}}catch{}}
   UI.li={busy:true};render();
-  try{if(file.size>15*1024*1024)throw{code:"big"};const r=await assets.upload(file);
+  try{if(file.size>15*1024*1024)throw{code:"big"};
     const p2=x=>String(x).padStart(2,"0"),lm=file.lastModified||0;
     if(UI.liOcr&&(!UI.liOcr.datum||!UI.liOcr.uhrzeit)&&lm&&Date.now()-lm<3*864e5&&Date.now()-lm>5000){const d=new Date(lm);if(!UI.liOcr.datum)UI.liOcr.datum=`${p2(d.getDate())}.${p2(d.getMonth()+1)}.${d.getFullYear()}`;if(!UI.liOcr.uhrzeit)UI.liOcr.uhrzeit=`${p2(d.getHours())}:${p2(d.getMinutes())}`;UI.liOcr.hinweis="Zeit aus der Bilddatei"}
     const o=UI.liOcr||{};let zeit=file.lastModified||Date.now(),datum="",uhrzeit="";
     if(o.datum){const[dd,mm,yy]=o.datum.split(".").map(Number),[hh,mi]=(o.uhrzeit||"12:00").split(":").map(Number);zeit=new Date(yy,mm-1,dd,hh,mi).getTime();datum=o.datum;uhrzeit=o.uhrzeit||""}
     else{const d=new Date(zeit);datum=`${p2(d.getDate())}.${p2(d.getMonth()+1)}.${d.getFullYear()}`;uhrzeit=o.uhrzeit||`${p2(d.getHours())}:${p2(d.getMinutes())}`}
+    /* Nur Screenshots von heute, höchstens 2 Stunden alt, nicht aus der Zukunft */
+    const nw=new Date(),zd=new Date(zeit);
+    if(isNaN(zeit)){UI.li={err:"Datum oder Uhrzeit auf dem Screenshot sind nicht lesbar."};render();return}
+    if(zd.toDateString()!==nw.toDateString()){UI.li={err:`Der Screenshot ist vom ${datum}. Es zählen nur Werbungen von heute.`};render();return}
+    if(zeit>nw.getTime()+5*6e4){UI.li={err:`Die Uhrzeit auf dem Screenshot (${uhrzeit} Uhr) liegt in der Zukunft.`};render();return}
+    if(zeit<nw.getTime()-2*36e5){UI.li={err:`Der Screenshot ist von ${uhrzeit} Uhr und damit älter als 2 Stunden. Reich Nachweise innerhalb von 2 Stunden nach dem Schalten ein.`};render();return}
+    const r=await assets.upload(file);
     const doc={kontoId:k.id,name:k.name,bild:r.url,eingereicht:Date.now(),zeit,datum,uhrzeit};let ev=null;
     if(UI.liOcr){try{ev=kiEval(UI.liOcr,{id:null,kontoId:k.id,name:k.name});Object.assign(doc,ev.patch)}catch{ev=null}}
-    const ref=await db.collection("nachweise").add(doc);let auto=false;
+    if(!doc.slot){const d=new Date(doc.zeit);doc.slot=`li-${k.id}-${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}${p2(d.getHours())}`}
+    const nid=(S.nachweise||[]).some(x=>x.id===doc.slot)?doc.slot+"-"+Date.now():doc.slot;
+    await db.doc("nachweise/"+nid).set(doc);const ref={id:nid};let auto=false;
     if(ev&&ev.ki.ok&&ref&&ref.id&&!slotBusy(doc.slot,ref.id)){try{await db.doc("pruefung/"+ref.id).set(autoOk());auto=true}catch{}}
     UI.li={ok:auto?`Automatisch angenommen für ${k.name} (${doc.datum}, ${doc.uhrzeit} Uhr). Der Screenshot zählt schon zur Auszahlung.`:`Eingereicht für ${k.name}. ${ev&&ev.ki.grund?`Automatik: ${ev.ki.grund} `:""}Die Leitung prüft deinen Screenshot, danach zählt er zur Auszahlung.`}}
   catch(e){UI.li={err:e&&e.code==="big"?"Das Bild ist zu groß. Bitte unter 15 MB.":"Hochladen fehlgeschlagen. Bitte nochmal versuchen."}}render()}
