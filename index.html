@@ -1465,12 +1465,15 @@ function vNachweise(){
        ${st!=="offen"?`<button class="btn sm ghost" data-act="li-reset" data-id="${n.id}">Zurücksetzen</button><button class="btn sm ghost" data-act="li-arch" data-id="${n.id}" title="Aus der Liste entfernen. Die Auszahlung bleibt.">${UI.confirmDel===n.id?"Wirklich ausblenden?":"Ausblenden"}</button><button class="btn sm danger" data-act="li-kill" data-id="${n.id}" title="Komplett löschen, zählt nicht mehr zur Auszahlung">${UI.killAsk===n.id?"Sicher? Zählt dann nicht mehr":"Ganz löschen"}</button>`:""}</div>`:""}
     </div></div>`}).join("")}</div>`:`<div class="empty" style="border:0">${f==="offen"?"Keine offenen Nachweise. Alles geprüft.":"Keine Nachweise in dieser Ansicht."}</div>`}</div>`;
 }
+/* Sonntag ab 18:00 wird ausgezahlt: bis Montag 00:00 keine LI-Nachweise mehr */
+const liClosed=(d=new Date())=>d.getDay()===0&&d.getHours()>=18;
+const LI_CLOSED_MSG="Sonntag ab 18:00 Uhr wird ausgezahlt. Bis Mitternacht können keine Screenshots mehr eingereicht werden. Ab Montag 00:00 geht es wieder.";
 function liSubmit(){
-  const li=UI.li||{},t=tarife(null);
+  const li=UI.li||{},t=tarife(null),cl=liClosed();
   return`<div class="card pad stack" style="gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:14px">Screenshot einreichen</h3><span class="hint">${money(t.werbung)} pro Werbung · max. 1 pro Stunde</span></div>
     <div class="hint" style="line-height:1.6">Nach dem Schalten sofort einen <b>Vollbild-Screenshot</b> machen. Oben links muss eure Anzeige mit <b>Sender: dein Name</b> stehen, unten rechts Uhrzeit und Datum.</div>
     <label class="f" for="liName">Dein Name<select class="i" id="liName"><option value="">Name auswählen …</option>${sortedKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${(UI.liKid||meId())===k.id?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
-    <button class="copybig" data-act="li-pick-pub"${li.busy?" disabled":""}>${svg("image")}${li.busy?"Wird bearbeitet …":"Screenshot einreichen"}</button>
+    ${cl?`<div class="note">${svg("clock")}<span>${LI_CLOSED_MSG}</span></div>`:""}<button class="copybig" data-act="li-pick-pub"${li.busy||cl?" disabled":""}${cl?' style="opacity:.45;cursor:not-allowed"':""}>${svg("image")}${li.busy?"Wird bearbeitet …":cl?"Einreichen geschlossen":"Screenshot einreichen"}</button>
     ${li.busy?`<div class="note">${svg("clock")}${li.msg?esc(li.msg)+" Beim ersten Mal dauert es etwas länger.":"Screenshot wird hochgeladen …"}</div>`:""}
     ${li.ok?`<div class="note" style="color:var(--l1);border-color:color-mix(in srgb,var(--l1) 40%,transparent)">${svg("check")}<span>${esc(li.ok)}</span></div>`:""}
     ${li.err?`<div class="note" style="color:var(--l3);border-color:color-mix(in srgb,var(--l3) 40%,transparent)">${svg("info")}<span>${esc(li.err)}</span></div>${li.force?`<button class="btn" data-act="li-force">Trotzdem einreichen</button>`:""}`:""}
@@ -1520,7 +1523,7 @@ Antworte nur mit JSON: {"anzeige":true,"sender":"Vorname Nachname","datum":"TT.M
 }
 
 
-async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;UI.li={busy:true,msg:"Screenshot wird gelesen …"};render();
+async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}UI.li={busy:true,msg:"Screenshot wird gelesen …"};render();
   UI.liOcr=null;if(!force){try{const r=await HR.ocrLI(file,(S.content?.werbung||"").trim(),S.konten.map(x=>x.name),k.name);
       UI.liOcr=r;const why=!r.anzeige?"Unsere Anzeige wurde oben links nicht erkannt.":r.senders&&r.senders.length&&!r.senders.includes(k.name)?`Unter eurer Anzeige steht ${r.senders.map(x=>"„"+x+"“").join(" und ")}, nicht ${k.name}. Jeder reicht nur seine eigene Anzeige ein.`:"";
       if(why){UI.liFile=file;UI.li={err:why+" Prüfe den Screenshot. Wenn er stimmt, kannst du ihn trotzdem einreichen, die Leitung schaut ihn sich dann an.",force:true};render();return}}catch{}}
@@ -1732,7 +1735,7 @@ document.addEventListener("click",async e=>{
   if(a==="login-save"){const k=konto(id),em=$("#nlE").value.trim(),pw=$("#nlP").value;if(!em||pw.length<6){toast("E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.");return}
     try{await HR.createLogin(id,em,pw);UI.newLogin=null;await db.collection("log").add({wer:whoName(),zeit:Date.now(),text:`Login für ${k.name} angelegt (${em})`,by:uid||""});toast(`Login für ${k.name} angelegt`)}catch(er){toast(authErr(er))}render();return}
   if(a==="login-del"){if(UI.confirmDel!==id){UI.confirmDel=id;render();return}UI.confirmDel=null;try{await HR.removeLogin(id);toast("Login entfernt")}catch{toast("Entfernen fehlgeschlagen.")}render();return}
-  if(a==="li-pick-pub"){const kid=$("#liName")?.value;if(!kid){toast("Wähle zuerst deinen Namen aus.");return}UI.liKid=kid;$("#liPubIn").value="";$("#liPubIn").click();return}
+  if(a==="li-pick-pub"){if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}const kid=$("#liName")?.value;if(!kid){toast("Wähle zuerst deinen Namen aus.");return}UI.liKid=kid;$("#liPubIn").value="";$("#liPubIn").click();return}
   if(a==="li-force"){if(UI.liFile){const f=UI.liFile;UI.liFile=null;submitPublic(f,true)}return}
   if(a==="li-ki"){const n=S.nachweise.find(x=>x.id===id);if(n)kiCheck(n);return}
   if(a==="li-ki-all"){kiQueue(true);return}
