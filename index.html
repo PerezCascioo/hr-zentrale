@@ -1253,29 +1253,41 @@ const secId=wid=>"secret-"+wid;
 const isSec=g=>String(g&&g.id||"").startsWith("secret-");
 const secOf=wid=>(S.geschenke||[]).find(g=>g.id===secId(wid));
 const secAmt=g=>{const ms=gMs(g&&g.zeit);return ms?10000+(secHash(g.id+":"+ms)%41)*1000:0};
-function secSpotOf(wk){const salt=S.content?.secretSalt||"hrz-46";const pick=w=>secHash(w.id+"|"+salt)%SEC_SPOTS.length;let i=pick(wk);
-  const prev=weekOf(new Date(wk.von-3*864e5));if(prev.von>=NEU_AB&&pick(prev)===i)i=(i+1+secHash(wk.id)%(SEC_SPOTS.length-1))%SEC_SPOTS.length;return SEC_SPOTS[i]}
-function secSpot(){const wk=weekOf();if(wk.von<NEU_AB||Date.now()<NEU_AB||!live||secOf(wk.id))return null;return secSpotOf(wk)}
-const secBtn=spot=>secSpot()===spot?`<button type="button" class="hsec" data-sec aria-label="Stern">${SEC_STAR}</button>`:"";
-function secPlace(){const sp=secSpot();[["secLogo","logo"],["secFoot","foot"],["secSet","set"]].forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.innerHTML=sp===k?secBtn(k):""});
-  const sky=$("#secSky");if(sky){if(sp==="sky"){const h=secHash(weekOf().id+"sky");sky.innerHTML=`<span style="position:absolute;left:${12+h%70}%;top:${18+(h>>8)%64}%">${secBtn("sky")}</span>`;sky.querySelector(".hsec").style.margin="0"}else sky.innerHTML=""}}
+/* Schummelsicher: An allen 11 Orten liegt ein gleich aussehender Stern. Welcher echt ist, steht nur in
+   config/secret (nur Leitung kann das lesen). Firebase prüft beim Klick selbst, ob der Ort stimmt.
+   Pro Person ist nur alle 30 Minuten ein Versuch möglich. */
+const SEC_WAIT=30*6e4;
+function secOpen(){const wk=weekOf();return wk.von>=NEU_AB&&Date.now()>=NEU_AB&&live&&!secOf(wk.id)}
+const secBtn=spot=>secOpen()?`<button type="button" class="hsec" data-sec="${spot}" aria-label="Stern">${SEC_STAR}</button>`:"";
+function secPlace(){const on=secOpen();[["secLogo","logo"],["secFoot","foot"],["secSet","set"]].forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.innerHTML=on?secBtn(k):""});
+  const sky=$("#secSky");if(sky){if(on){const h=secHash(weekOf().id+"sky");sky.innerHTML=`<span style="position:absolute;left:${12+h%70}%;top:${18+(h>>8)%64}%">${secBtn("sky")}</span>`}else sky.innerHTML=""}
+  if(UI.admin&&live)secEnsure()}
+/* Leitung: jeden Montag automatisch einen neuen geheimen Ort auslosen */
+let secEnsured="";
+async function secEnsure(force){const wk=weekOf();if(wk.von<NEU_AB||!db||(!force&&secEnsured===wk.id))return;secEnsured=wk.id;
+  try{const r=db.doc("config/secret"),d=await r.get(),o=d.exists?d.data()||{}:{};if(!force&&o.wid===wk.id)return;
+    let ort;do{ort=SEC_SPOTS[Math.floor(Math.random()*SEC_SPOTS.length)]}while(ort===o.ort);await r.set({wid:wk.id,ort})}catch{secEnsured=""}}
 function secShow(html){const b=$("#giftBody");b.innerHTML=`<header><div><div class="eyebrow">Secret der Woche</div></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header><div class="secfound">${html}</div>`;const d=$("#giftDlg");if(!d.open)d.showModal()}
+const hhmm=t=>new Date(t).toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"});
 let secBusy=false;
-async function doSecret(){if(secBusy)return;const wk=weekOf(),kid=meId(),k=konto(kid);
+async function doSecret(ort){if(secBusy)return;const wk=weekOf(),kid=meId(),k=konto(kid);
   if(!k){toast("Wähle zuerst unten links unter „Wer bist du?“ deinen Namen.");return}
   if(!db){toast("Gerade keine Verbindung.");return}
   secBusy=true;try{const ref=db.doc("geschenke/"+secId(wk.id));const ex=await ref.get();
     if(ex.exists){const g=ex.data()||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller. Ab Montag versteckt sich ein neues Secret.</p>`);render();return}
-    const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__"}),{won:true});
+    const vr=db.doc("versuche/"+k.id),vd=await vr.get(),v=vd.exists?vd.data()||{}:null,last=v?gMs(v.t):0;
+    if(last&&Date.now()-last<SEC_WAIT){secShow(`<h2>Noch warten</h2><p class="hint">${esc(k.name)} hatte gerade einen Versuch. Der nächste ist ab <b>${hhmm(last+SEC_WAIT)} Uhr</b> möglich.</p>`);return}
+    try{await vr.set({ort,wid:wk.id,t:"__NOW__"})}catch(e){secShow(`<h2>Noch warten</h2><p class="hint">Pro Person ist nur alle 30 Minuten ein Versuch möglich.</p>`);return}
+    let cl;try{cl=await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name,ort})}
+    catch(e){secShow(`<h2>Hier ist nichts</h2><p class="hint">Das war nicht das echte Secret. Nächster Versuch für ${esc(k.name)} ab <b>${hhmm(Date.now()+SEC_WAIT)} Uhr</b>.</p>`);return}
     if(!cl.won){const o=cl.data||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(o.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
-    if(g.kontoId!==k.id){secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     if(!S.geschenke.some(x=>x.id===g.id))S.geschenke=[g,...S.geschenke];const a=secAmt(g);
     try{await db.collection("log").add({zeit:Date.now(),text:`Secret der Woche gefunden von ${k.name} (+${money(a)})`,by:uid||""})}catch{}
-    secShow(`<h2>Du hast das Secret gefunden!</h2><div class="big">+${money(a||0)}</div><p class="hint">Glückwunsch, ${esc(k.name)}! Der Betrag kommt automatisch auf deine Auszahlung dieser Woche. Nächsten Montag versteckt sich ein neues Secret, an einem anderen Ort.</p>`);
+    secShow(`<h2>Du hast das Secret gefunden!</h2><div class="big">+${money(a||0)}</div><p class="hint">Glückwunsch, ${esc(k.name)}! Der Betrag kommt automatisch auf deine Auszahlung dieser Woche. Nächsten Montag versteckt sich ein neues Secret.</p>`);
     try{confetti()}catch{}render()}
   catch(e){toast("Das hat nicht geklappt. Bitte nochmal versuchen.")}finally{secBusy=false}}
-document.addEventListener("click",e=>{if(e.target.closest("[data-sec]")){e.preventDefault();e.stopPropagation();doSecret()}},true);
+document.addEventListener("click",e=>{const b=e.target.closest("[data-sec]");if(b){e.preventDefault();e.stopPropagation();doSecret(b.dataset.sec)}},true);
 let sample=null,sampleOK=false;
 const isLeitung=kid=>!!konto(kid)?.leitung;
 const isAushilfe=kid=>/aushilf/i.test(konto(kid)?.position||"");
@@ -1768,10 +1780,7 @@ document.addEventListener("click",async e=>{
   if(a==="fb-del"){if(UI.confirmDel!==id){UI.confirmDel=id;render();return}UI.confirmDel=null;const x=(S.feedback||[]).find(y=>y.id===id);
     if(await write(()=>db.doc("feedback/"+id).delete(),`Feedback von ${x&&x.name||"Anonym"} gelöscht`))toast("Feedback gelöscht");return}
   if(a==="sec-reset"){if(UI.confirmDel!=="sec:"+id){UI.confirmDel="sec:"+id;render();return}UI.confirmDel=null;const sf=secOf(id);
-    const wkx=weekOf(),oldSp=secSpotOf(wkx),oldSalt=S.content?.secretSalt;let salt="";
-    for(let i=0;i<50;i++){salt=Math.random().toString(36).slice(2,10);if(S.content)S.content.secretSalt=salt;if(secSpotOf(wkx)!==oldSp)break}
-    if(S.content)S.content.secretSalt=oldSalt;
-    if(await write(async()=>{await db.doc("geschenke/"+secId(id)).delete();await db.doc("hr/content").update({secretSalt:salt})},`Secret der Woche neu versteckt${sf?` (war gefunden von ${sf.name}, ${money(secAmt(sf))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==secId(id));if(S.content)S.content.secretSalt=salt;render();toast("Secret ist an einem neuen Ort versteckt und kann wieder gefunden werden")}return}
+    if(await write(async()=>{await db.doc("geschenke/"+secId(id)).delete();await secEnsure(true)},`Secret der Woche neu versteckt${sf?` (war gefunden von ${sf.name}, ${money(secAmt(sf))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==secId(id));render();toast("Secret ist an einem neuen Ort versteckt und kann wieder gefunden werden")}return}
   if(a==="gift-reset"){if(UI.confirmDel!=="gift:"+id){UI.confirmDel="gift:"+id;render();return}UI.confirmDel=null;const g=giftOf(id);
     if(await write(()=>db.doc("geschenke/"+id).delete(),`Geschenk der Woche zurückgesetzt${g?` (war ${g.name}, ${money(giftAmt(g))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==id);giftReady();render();toast("Geschenk zurückgesetzt, es kann neu geöffnet werden")}return}
   if(a==="zeit-save"){const o={};for(const [d,,l] of ZTAGE){const v=$("#zv-"+d).value,b=$("#zb-"+d).value;if(!!v!==!!b){toast(`${l}: Start und Ende eintragen oder beides leer lassen.`);return}o[d]=v&&b?[v,b]:null}

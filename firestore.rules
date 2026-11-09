@@ -81,19 +81,51 @@ service cloud.firestore {
       allow update, delete: if isLeitung();
     }
 
-    // Geschenk (w-JJJJ-MM-TT) und Secret der Woche (secret-w-JJJJ-MM-TT):
-    // nur einmal anlegen, nur in der eigenen Woche, danach von niemandem ausser der Leitung änderbar.
+    // Geschenk der Woche (w-JJJJ-MM-TT): nur einmal anlegen, nur in der eigenen Woche.
+    // Secret der Woche (secret-w-JJJJ-MM-TT): zusätzlich muss der angeklickte Ort mit dem geheimen Ort
+    // in config/secret übereinstimmen (das kann nur die Leitung lesen) und zum letzten Versuch der Person passen.
+    function secretCfg() { return get(/databases/$(database)/documents/config/secret).data; }
+    function versuch(kid) { return get(/databases/$(database)/documents/versuche/$(kid)).data; }
     match /geschenke/{wid} {
       allow read: if true;
-      allow create: if wid.matches('(secret-)?w-[0-9]{4}-[0-9]{2}-[0-9]{2}')
-        && request.resource.data.keys().hasOnly(['kontoId','name','zeit'])
-        && request.resource.data.zeit == request.time
+      allow create: if request.resource.data.zeit == request.time
         && request.resource.data.name is string && request.resource.data.name.size() < 80
         && request.resource.data.kontoId is string
         && exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
         && request.time >= wStart(wid.replace('secret-', '')) - duration.value(2, 'h')
-        && request.time < wStart(wid.replace('secret-', '')) + duration.value(7, 'd');
+        && request.time < wStart(wid.replace('secret-', '')) + duration.value(7, 'd')
+        && (
+          (wid.matches('w-[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.keys().hasOnly(['kontoId','name','zeit']))
+          ||
+          (wid.matches('secret-w-[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.keys().hasOnly(['kontoId','name','zeit','ort'])
+            && exists(/databases/$(database)/documents/config/secret)
+            && secretCfg().wid == wid.replace('secret-', '')
+            && request.resource.data.ort == secretCfg().ort
+            && exists(/databases/$(database)/documents/versuche/$(request.resource.data.kontoId))
+            && versuch(request.resource.data.kontoId).ort == request.resource.data.ort
+            && versuch(request.resource.data.kontoId).wid == secretCfg().wid
+            && versuch(request.resource.data.kontoId).t > request.time - duration.value(2, 'm'))
+        );
       allow update, delete: if isLeitung();
+    }
+
+    // Secret-Versuche: pro Mitarbeiter höchstens ein Versuch alle 30 Minuten.
+    match /versuche/{kid} {
+      allow read: if true;
+      allow create: if exists(/databases/$(database)/documents/konten/$(kid))
+        && request.resource.data.keys().hasOnly(['ort','wid','t'])
+        && request.resource.data.t == request.time
+        && request.resource.data.ort is string && request.resource.data.ort.size() < 30
+        && request.resource.data.wid is string && request.resource.data.wid.size() < 30;
+      allow update: if exists(/databases/$(database)/documents/konten/$(kid))
+        && request.resource.data.keys().hasOnly(['ort','wid','t'])
+        && request.resource.data.t == request.time
+        && request.resource.data.ort is string && request.resource.data.ort.size() < 30
+        && request.resource.data.wid is string && request.resource.data.wid.size() < 30
+        && request.time > resource.data.t + duration.value(30, 'm');
+      allow delete: if isLeitung();
     }
 
     // Bilder: anlegen darf jeder. Profilbilder (pp-<konto>) darf jeder auch ersetzen oder entfernen.
@@ -109,7 +141,7 @@ service cloud.firestore {
 
     match /{coll}/{id} {
       allow read: if !(coll in ['config','log','feedback']);
-      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke']);
+      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke','versuche']);
     }
   }
 }
