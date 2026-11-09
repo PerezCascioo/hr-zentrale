@@ -1037,7 +1037,7 @@ function meFoot(){const k=konto(UI.meSel),gast=`<button class="btn" data-me-gast
   if(UI.zg===null)return`<div class="hint" style="margin-top:8px">Einen Moment …</div>`;
   if(UI.zg&&UI.zg.uid)return`<div class="stack" style="gap:8px;margin-top:8px">
     <label class="f" for="maP">Dein Passwort<input class="i" id="maP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
-    <span class="hint">Passwort vergessen? Die Leitung kann es in der Mitarbeiterliste zurücksetzen.</span>
+    <span class="hint">Passwort vergessen? Die Leitung kann es in der Mitarbeiterliste zurücksetzen.${k.leitung?` <button type="button" class="btn sm ghost" data-me-shared style="padding:2px 6px">Gemeinsames Leitungs-Passwort benutzen</button>`:""}</span>
     <div class="row" style="gap:8px">${gast}<button class="btn pri" data-ma-login style="flex:1">Anmelden</button></div></div>`;
   return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">Für ${esc(k.name)} gibt es noch kein Passwort. Die Leitung gibt dir ein Startpasswort, das du danach selbst änderst.</span>
     <div class="row" style="gap:8px">${gast}</div></div>`}
@@ -2249,6 +2249,7 @@ $("#loginDlg").addEventListener("click",async e=>{
   if(e.target.closest("[data-ma-login]")){const pw=$("#maP").value;if(!pw){$("#lgMsg").textContent="Passwort eingeben.";return}$("#lgMsg").textContent="Melde an …";try{await HR.maLogin(UI.meSel,pw)}catch(er){$("#lgMsg").textContent=er&&er.code==="ma/no-pw"?"Für diesen Namen ist noch kein Passwort festgelegt.":authErr(er)}return}
   if(e.target.closest("[data-ma-setup]")){const p1=$("#maN1").value,p2=$("#maN2").value;if(p1.length<6){$("#lgMsg").textContent="Das Passwort braucht mindestens 6 Zeichen.";return}if(p1!==p2){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}
     $("#lgMsg").textContent="Lege dein Passwort fest …";try{await HR.maSetup(UI.meSel,p1)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
+  if(e.target.closest("[data-me-shared]")){UI.zg=false;$("#meFoot").innerHTML=meFoot();setTimeout(()=>$("#meP")?.focus(),30);return}
   if(e.target.closest("[data-ma-logout]")){await HR.logout();return}
   if(e.target.closest("[data-pw-change]")){openPwChange(false);return}
   if(e.target.closest("[data-pw-save]")){const o=$("#pwOld")?.value||"",p1=$("#pwN1").value,p2=$("#pwN2").value;if(p1.length<6){$("#lgMsg").textContent="Das Passwort braucht mindestens 6 Zeichen.";return}if(p1!==p2){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}
