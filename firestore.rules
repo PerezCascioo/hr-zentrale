@@ -12,6 +12,30 @@ service cloud.firestore {
     function wStart(wid) { return timestamp.date(int(wid.split('-')[1]), int(wid.split('-')[2]), int(wid.split('-')[3])); }
     function nachweis(id) { return /databases/$(database)/documents/nachweise/$(id); }
     function nowMs() { return request.time.toMillis(); }
+    // Ist der angemeldete Benutzer dieser Mitarbeiter? (eigenes Passwort, verknüpft in zugang/<konto>)
+    function zugangDoc(kid) { return /databases/$(database)/documents/zugang/$(kid); }
+    function me(kid) {
+      return isLeitung() || (request.auth != null && kid is string && exists(zugangDoc(kid)) && get(zugangDoc(kid)).data.uid == request.auth.uid);
+    }
+
+    // Mitarbeiter-Passwörter: Jeder legt sein eigenes fest. Nach „Passwort zurücksetzen“ durch die Leitung
+    // (uid = null, neue Version) kann die Person ein neues festlegen.
+    match /zugang/{kid} {
+      allow read: if true;
+      allow create: if isLeitung() || (request.auth != null
+        && exists(/databases/$(database)/documents/konten/$(kid))
+        && request.resource.data.keys().hasOnly(['uid','v','seit'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.v == 1
+        && request.auth.token.email == kid.lower() + '.1@ma.hr-zentral.app');
+      allow update: if isLeitung() || (request.auth != null
+        && resource.data.uid == null
+        && request.resource.data.keys().hasOnly(['uid','v','seit'])
+        && request.resource.data.v == resource.data.v
+        && request.resource.data.uid == request.auth.uid
+        && request.auth.token.email == kid.lower() + '.' + string(resource.data.v) + '@ma.hr-zentral.app');
+      allow delete: if isLeitung();
+    }
 
     match /meta/owner {
       allow read: if true;
@@ -27,8 +51,8 @@ service cloud.firestore {
     // aber nur kurze Texte und nie ändern oder löschen.
     match /log/{id} {
       allow read, update, delete: if isLeitung();
-      allow create: if isLeitung() || (
-        request.resource.data.keys().hasOnly(['zeit','text','by'])
+      allow create: if isLeitung() || (request.auth != null
+        && request.resource.data.keys().hasOnly(['zeit','text','by'])
         && request.resource.data.text is string && request.resource.data.text.size() < 300
         && request.resource.data.zeit is number
         && request.resource.data.zeit > nowMs() - 600000 && request.resource.data.zeit < nowMs() + 600000);
@@ -43,7 +67,8 @@ service cloud.firestore {
     match /nachweise/{id} {
       allow read: if true;
       allow create: if isLeitung() || (
-        exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
+        me(request.resource.data.kontoId)
+        && exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
         && request.resource.data.keys().hasOnly(['kontoId','name','bild','eingereicht','zeit','datum','uhrzeit','ki','slot','by'])
         && id.matches('li-' + request.resource.data.kontoId + '-[0-9]{10}(-[0-9]+)?')
         && request.resource.data.bild is string && request.resource.data.bild.size() < 200
@@ -65,6 +90,7 @@ service cloud.firestore {
         && request.resource.data.by == 'auto'
         && id.matches('li-[A-Za-z0-9_]+-[0-9]{10}')
         && exists(nachweis(id))
+        && me(get(nachweis(id)).data.kontoId)
         && get(nachweis(id)).data.get('ki', {}).get('ok', false) == true
         && get(nachweis(id)).data.zeit > nowMs() - 7500000);
       allow update, delete: if isLeitung();
@@ -77,6 +103,7 @@ service cloud.firestore {
         && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
         && request.resource.data.name is string && request.resource.data.name.size() < 80
         && request.resource.data.kontoId is string && request.resource.data.kontoId.size() < 80
+        && (request.resource.data.kontoId == '' || me(request.resource.data.kontoId))
         && request.resource.data.zeit is number;
       allow update, delete: if isLeitung();
     }
@@ -91,6 +118,7 @@ service cloud.firestore {
       allow create: if request.resource.data.zeit == request.time
         && request.resource.data.name is string && request.resource.data.name.size() < 80
         && request.resource.data.kontoId is string
+        && me(request.resource.data.kontoId)
         && exists(/databases/$(database)/documents/konten/$(request.resource.data.kontoId))
         && request.time >= wStart(wid.replace('secret-', '')) - duration.value(2, 'h')
         && request.time < wStart(wid.replace('secret-', '')) + duration.value(7, 'd')
@@ -116,12 +144,12 @@ service cloud.firestore {
     // Secret-Versuche: pro Mitarbeiter höchstens ein Versuch alle 30 Minuten.
     match /versuche/{kid} {
       allow read: if true;
-      allow create: if exists(/databases/$(database)/documents/konten/$(kid))
+      allow create: if me(kid) && exists(/databases/$(database)/documents/konten/$(kid))
         && request.resource.data.keys().hasOnly(['ort','wid','t'])
         && request.resource.data.t == request.time
         && request.resource.data.ort is string && request.resource.data.ort.size() < 30
         && request.resource.data.wid is string && request.resource.data.wid.size() < 30;
-      allow update: if exists(/databases/$(database)/documents/konten/$(kid))
+      allow update: if me(kid) && exists(/databases/$(database)/documents/konten/$(kid))
         && request.resource.data.keys().hasOnly(['ort','wid','t'])
         && request.resource.data.t == request.time
         && request.resource.data.ort is string && request.resource.data.ort.size() < 30
@@ -133,17 +161,17 @@ service cloud.firestore {
     // Bilder: anlegen darf jeder. Profilbilder (pp-<konto>) darf jeder auch ersetzen oder entfernen.
     match /bilder/{id} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['src','zeit'])
+      allow create: if request.auth != null && request.resource.data.keys().hasOnly(['src','zeit'])
         && request.resource.data.src is string && request.resource.data.src.size() < 1000000;
-      allow update: if isLeitung() || (id.matches('pp-.+')
+      allow update: if isLeitung() || (id.matches('pp-.+') && me(id.replace('^pp-', ''))
         && request.resource.data.keys().hasOnly(['src','zeit'])
         && request.resource.data.src is string && request.resource.data.src.size() < 1000000);
-      allow delete: if isLeitung() || id.matches('pp-.+');
+      allow delete: if isLeitung() || (id.matches('pp-.+') && me(id.replace('^pp-', '')));
     }
 
     match /{coll}/{id} {
       allow read: if !(coll in ['config','log','feedback']);
-      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke','versuche']);
+      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke','versuche','zugang']);
     }
   }
 }
