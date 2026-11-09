@@ -83,7 +83,7 @@ service cloud.firestore {
 
     // Geschenk der Woche (w-JJJJ-MM-TT): nur einmal anlegen, nur in der eigenen Woche.
     // Secret der Woche (secret-w-JJJJ-MM-TT): zusätzlich muss der angeklickte Ort mit dem geheimen Ort
-    // in config/secret übereinstimmen (das kann nur die Leitung lesen) und zum letzten Versuch der Person passen.
+    // in config/secret übereinstimmen (das kann nur die Leitung lesen), gerade sichtbar sein und zum letzten Versuch der Person passen.
     function secretCfg() { return get(/databases/$(database)/documents/config/secret).data; }
     function versuch(kid) { return get(/databases/$(database)/documents/versuche/$(kid)).data; }
     match /geschenke/{wid} {
@@ -103,6 +103,8 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/config/secret)
             && secretCfg().wid == wid.replace('secret-', '')
             && request.resource.data.ort == secretCfg().ort
+            // Der echte Stern ist pro Stunde nur 12 Minuten sichtbar (+2 Minuten Kulanz)
+            && (request.time.minutes() + secretCfg().off) % 60 < 14
             && exists(/databases/$(database)/documents/versuche/$(request.resource.data.kontoId))
             && versuch(request.resource.data.kontoId).ort == request.resource.data.ort
             && versuch(request.resource.data.kontoId).wid == secretCfg().wid
