@@ -1018,8 +1018,7 @@ const editBtn=k=>writable()?`<button class="btn${UI.edit[k]?" pri":""}" data-edi
 
 /* Mehrere Änderungen kurz hintereinander nur einmal zeichnen */
 let _rt=0;function renderSoon(){if(_rt)return;_rt=setTimeout(()=>{_rt=0;render()},80)}
-function render(){try{secPlace()}catch{}
-  render2()}
+function render(){render2();try{secPlace()}catch{}}
 function render2(){
   renderNav();if(typeof renderAuth==="function")renderAuth();
   const v=$("#view");
@@ -1246,7 +1245,13 @@ const giftOf=wid=>(S.geschenke||[]).find(g=>g.id===wid);
    Nur wer ihn zuerst anklickt, bekommt 10.000 bis 50.000 auf die Wochenauszahlung. */
 const GIFT_AB=new Date(2026,11,1).getTime();
 const giftOn=()=>Date.now()<NEU_AB||Date.now()>=GIFT_AB;
-const SEC_SPOTS=["ueberblick","richtlinien","kleidung","auszahlungen","werbung","konten","feedback","logo","sky","set","foot"];
+const SEC_TABS=["ueberblick","richtlinien","kleidung","auszahlungen","werbung","konten","feedback"];
+/* 28 mögliche Orte: Titel und Text jedes Bereichs, jeder Menüpunkt, Logo, Fusszeile, Einstellungen, 4 Stellen im Sternenhimmel */
+const SEC_SPOTS=[...SEC_TABS.flatMap(t=>[t+"-titel",t+"-text","nav-"+t]),"logo","foot","set","sky-1","sky-2","sky-3","sky-4"];
+/* Jeder Stern ist pro Stunde nur 12 Minuten sichtbar, zu einer anderen Zeit als die anderen */
+const SEC_SHOW=12;
+const secOff=(wid,spot)=>secHash(wid+"|"+spot)%60;
+const secVisible=(spot,d=new Date())=>(d.getUTCMinutes()+secOff(weekOf().id,spot))%60<SEC_SHOW;
 const SEC_STAR='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.2H22l-6.2 4.5 2.4 7.3-6.2-4.5-6.2 4.5 2.4-7.3L2 9.2h7.6z"/></svg>';
 const secHash=x=>{let h=2166136261;for(const c of String(x))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0};
 const secId=wid=>"secret-"+wid;
@@ -1258,15 +1263,21 @@ const secAmt=g=>{const ms=gMs(g&&g.zeit);return ms?10000+(secHash(g.id+":"+ms)%4
    Pro Person ist nur alle 30 Minuten ein Versuch möglich. */
 const SEC_WAIT=30*6e4;
 function secOpen(){const wk=weekOf();return wk.von>=NEU_AB&&Date.now()>=NEU_AB&&live&&!secOf(wk.id)}
-const secBtn=spot=>secOpen()?`<button type="button" class="hsec" data-sec="${spot}" aria-label="Stern">${SEC_STAR}</button>`:"";
-function secPlace(){const on=secOpen();[["secLogo","logo"],["secFoot","foot"],["secSet","set"]].forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.innerHTML=on?secBtn(k):""});
-  const sky=$("#secSky");if(sky){if(on){const h=secHash(weekOf().id+"sky");sky.innerHTML=`<span style="position:absolute;left:${12+h%70}%;top:${18+(h>>8)%64}%">${secBtn("sky")}</span>`}else sky.innerHTML=""}
+const secBtn=()=>"";
+const secStar=spot=>`<button type="button" class="hsec" data-sec="${spot}" aria-label="Stern">${SEC_STAR}</button>`;
+function secPlace(){document.querySelectorAll(".hsec").forEach(x=>{const p=x.parentElement;x.remove();if(p&&p.classList.contains("secpos"))p.remove()});
+  const on=secOpen();if(on){const wid=weekOf().id,vis=sp=>secVisible(sp),put=(el,sp)=>{if(el&&vis(sp))el.insertAdjacentHTML("beforeend",secStar(sp))};
+    const t=UI.tab;if(SEC_TABS.includes(t)){put($("#view .phead h1"),t+"-titel");put($("#view .phead p"),t+"-text")}
+    SEC_TABS.forEach(x=>put(document.querySelector(`#nav .nav[data-tab="${x}"]`),"nav-"+x));
+    put($("#secLogo"),"logo");put($("#secFoot"),"foot");put($("#secSet"),"set");
+    const sky=$("#secSky");if(sky)[1,2,3,4].forEach(i=>{const sp="sky-"+i;if(!vis(sp))return;const h=secHash(wid+sp);sky.insertAdjacentHTML("beforeend",`<span class="secpos" style="position:absolute;left:${8+h%80}%;top:${12+(h>>8)%74}%">${secStar(sp)}</span>`)})}
   if(UI.admin&&live)secEnsure()}
+setInterval(()=>{try{secPlace()}catch{}},20000);
 /* Leitung: jeden Montag automatisch einen neuen geheimen Ort auslosen */
 let secEnsured="";
 async function secEnsure(force){const wk=weekOf();if(wk.von<NEU_AB||!db||(!force&&secEnsured===wk.id))return;secEnsured=wk.id;
   try{const r=db.doc("config/secret"),d=await r.get(),o=d.exists?d.data()||{}:{};if(!force&&o.wid===wk.id)return;
-    let ort;do{ort=SEC_SPOTS[Math.floor(Math.random()*SEC_SPOTS.length)]}while(ort===o.ort);await r.set({wid:wk.id,ort})}catch{secEnsured=""}}
+    let ort;do{ort=SEC_SPOTS[Math.floor(Math.random()*SEC_SPOTS.length)]}while(ort===o.ort);await r.set({wid:wk.id,ort,off:secOff(wk.id,ort)})}catch{secEnsured=""}}
 function secShow(html){const b=$("#giftBody");b.innerHTML=`<header><div><div class="eyebrow">Secret der Woche</div></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header><div class="secfound">${html}</div>`;const d=$("#giftDlg");if(!d.open)d.showModal()}
 const hhmm=t=>new Date(t).toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"});
 let secBusy=false;
