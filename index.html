@@ -815,7 +815,10 @@ const assets={upload:async file=>{const src=await shrink(file,1920,.82);const id
 const user0=await new Promise(r=>{const u=A.onAuthStateChanged(auth,x=>{u();r(x)})});
 const owner=await get("meta/owner");HR.hasOwner=!!owner;
 let kontoName="";
-if(user0){HR.uid=user0.uid;HR.owner=!!owner&&owner.uid===user0.uid;if(HR.owner){HR.role=3;kontoName="Leitung"}}
+/* Mitarbeiter melden sich mit eigenem Passwort an (E-Mail intern: <konto>.<version>@ma.hr-zentral.app) */
+const MAD="@ma.hr-zentral.app";
+if(user0&&String(user0.email||"").endsWith(MAD)){HR.maLow=user0.email.slice(0,-MAD.length).replace(/\.\d+$/,"").toLowerCase();HR.maUid=user0.uid}
+else if(user0){HR.uid=user0.uid;HR.owner=!!owner&&owner.uid===user0.uid;if(HR.owner){HR.role=3;kontoName="Leitung"}}
 const isAdmin=HR.role>=2;
 if(isAdmin){F.onSnapshot(F.doc(fs,"config/ai"),s=>{HR.ai=s.exists()?s.data():null},()=>{})}
 const user={id:async()=>HR.uid,me:async()=>({name:kontoName||HR.email||""}),can:async()=>isAdmin,canEdit:async()=>isAdmin,isOwner:()=>HR.owner,
@@ -837,6 +840,12 @@ const LEMAIL="leitung@"+cfg.projectId+".firebaseapp.com";
 HR.login=async pw=>{await A.signInWithEmailAndPassword(auth,LEMAIL,pw);location.reload()};
 HR.changePw=async pw=>{await A.updatePassword(auth.currentUser,pw)};
 HR.logout=async()=>{await A.signOut(auth);location.reload()};
+HR.zugang=kid=>get("zugang/"+kid);
+HR.maLogin=async(kid,pw)=>{const z=await get("zugang/"+kid);if(!z||!z.uid)throw{code:"ma/no-pw"};await A.signInWithEmailAndPassword(auth,kid.toLowerCase()+"."+(z.v||1)+MAD,pw);location.reload()};
+HR.maSetup=async(kid,pw)=>{const z=await get("zugang/"+kid);if(z&&z.uid)throw{code:"auth/email-already-in-use"};const v=(z&&z.v)||1,em=kid.toLowerCase()+"."+v+MAD;let cr;
+  try{cr=await A.createUserWithEmailAndPassword(auth,em,pw)}catch(e){if(e&&e.code==="auth/email-already-in-use")cr=await A.signInWithEmailAndPassword(auth,em,pw);else throw e}
+  await F.setDoc(F.doc(fs,"zugang/"+kid),{uid:cr.user.uid,v,seit:Date.now()}).catch(perm);location.reload()};
+HR.maReset=async kid=>{const z=await get("zugang/"+kid);await F.setDoc(F.doc(fs,"zugang/"+kid),{uid:null,v:((z&&z.v)||1)+1,seit:Date.now()}).catch(perm)};
 HR.createLogin=async(kontoId,email,pw)=>{const second=initializeApp(cfg,"zweit"+Date.now()),a2=A.getAuth(second);
   const cr=await A.createUserWithEmailAndPassword(a2,email,pw);await A.signOut(a2);
   await F.setDoc(F.doc(fs,"admins/"+cr.user.uid),{kontoId,email,angelegt:Date.now()}).catch(perm)};
@@ -982,17 +991,34 @@ const whoPicker=sel=>`<div class="f"><span>Wer bist du?</span><div style="displa
 /* Profil für alle ohne Login: Namen wählen oder Gast */
 const getMe=()=>{try{return localStorage.getItem("hrz-me")||""}catch{return""}};
 const setMe=v=>{try{localStorage.setItem("hrz-me",v)}catch{}};
-const meId=()=>HR.uid?getWho():(getMe()!=="gast"&&!konto(getMe())?.leitung?getMe():"");
-function applyMe(){if(HR.uid)return;let k=konto(getMe());if(k&&k.leitung){setMe("gast");k=null}const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
-function openMe(){const b=$("#loginBody");UI.meSel=getMe()==="gast"?"":getMe();
+/* Angemeldeter Mitarbeiter (E-Mail ist kleingeschrieben, darum ohne Gross-/Kleinschreibung suchen) */
+const maId=()=>HR.maLow?(S.konten.find(k=>String(k.id).toLowerCase()===HR.maLow)?.id||""):"";
+const meId=()=>HR.uid?getWho():maId();
+/* Wer darf in Formularen ausgewählt werden: Leitung alle, Mitarbeiter nur sich selbst */
+const myKonten=()=>HR.uid?sortedKonten():maId()?[konto(maId())]:[];
+function applyMe(){if(HR.uid)return;let k=maId()?konto(maId()):null;const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
+function openMe(){const b=$("#loginBody");
+  if(HR.maLow){const k=konto(maId());b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${esc(k?k.name:"Angemeldet")}</h2><p>Du bist mit deinem eigenen Passwort angemeldet.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
+    <div class="row" style="gap:8px"><button class="btn" data-close-login style="flex:1">Schließen</button><button class="btn danger" data-ma-logout style="flex:1">Abmelden</button></div>`;$("#loginDlg").showModal();return}
+  UI.meSel="";UI.zg=null;
   const chips=()=>`<div style="display:flex;gap:8px;flex-wrap:wrap;max-height:46vh;overflow:auto;padding:2px">${sortedKonten().map(k=>`<button type="button" class="btn${k.id===UI.meSel?" pri":""}" data-me-pick="${k.id}" aria-pressed="${k.id===UI.meSel}">${esc(k.name)}</button>`).join("")}</div>`;
-  b.innerHTML=`<header><div><div class="eyebrow">Willkommen bei HR Zentral</div><h2 id="loginT">Wer bist du?</h2><p>Dann ist dein Name bei LI-Werbung, Feedback und Geschenk schon ausgewählt. Kein Passwort nötig, nur die Leitung braucht ihres. Wechseln geht jederzeit unten links.</p></div><button class="ibtn" data-me-gast aria-label="Schließen">×</button></header>
+  b.innerHTML=`<header><div><div class="eyebrow">Willkommen bei HR Zentral</div><h2 id="loginT">Wer bist du?</h2><p>Wähle deinen Namen und melde dich mit deinem eigenen Passwort an. Beim ersten Mal legst du es selbst fest.</p></div><button class="ibtn" data-me-gast aria-label="Schließen">×</button></header>
    <div id="meBox">${chips()}</div><div id="meFoot">${meFoot()}</div>`;
   b._chips=chips;$("#loginDlg").showModal()}
-function meFoot(){const k=konto(UI.meSel);if(k&&k.leitung)return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">${esc(k.name)} gehört zur Leitung, dafür braucht es das Leitungs-Passwort.</span>
+function meFoot(){const k=konto(UI.meSel),gast=`<button class="btn" data-me-gast style="flex:1">Ich bin Gast</button>`;
+  if(!k)return`<div class="row" style="gap:8px;margin-top:6px">${gast}</div>`;
+  if(k.leitung)return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">${esc(k.name)} gehört zur Leitung, dafür braucht es das Leitungs-Passwort.</span>
     <label class="f" for="meP">Passwort<input class="i" id="meP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
-    <div class="row" style="gap:8px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-login style="flex:1">Anmelden</button></div></div>`;
-  return`<div class="row" style="gap:8px;margin-top:6px"><button class="btn" data-me-gast style="flex:1">Ich bin Gast</button><button class="btn pri" data-me-save style="flex:1">Übernehmen</button></div>`}
+    <div class="row" style="gap:8px">${gast}<button class="btn pri" data-me-login style="flex:1">Anmelden</button></div></div>`;
+  if(UI.zg===null)return`<div class="hint" style="margin-top:8px">Einen Moment …</div>`;
+  if(UI.zg&&UI.zg.uid)return`<div class="stack" style="gap:8px;margin-top:8px">
+    <label class="f" for="maP">Dein Passwort<input class="i" id="maP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
+    <span class="hint">Passwort vergessen? Die Leitung kann es in der Mitarbeiterliste zurücksetzen.</span>
+    <div class="row" style="gap:8px">${gast}<button class="btn pri" data-ma-login style="flex:1">Anmelden</button></div></div>`;
+  return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">Für ${esc(k.name)} gibt es noch kein Passwort. Leg jetzt dein eigenes fest. Danach kann sich niemand anderes mehr als ${esc(k.name.split(" ")[0])} ausgeben.</span>
+    <label class="f" for="maN1">Neues Passwort (mindestens 6 Zeichen)<input class="i" id="maN1" type="password" autocomplete="new-password"></label>
+    <label class="f" for="maN2">Passwort wiederholen<input class="i" id="maN2" type="password" autocomplete="new-password"></label><span class="status" id="lgMsg"></span>
+    <div class="row" style="gap:8px">${gast}<button class="btn pri" data-ma-setup style="flex:1">Passwort festlegen</button></div></div>`}
 function applyWho(){const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}setTimeout(()=>syncPic(),800)}}
 function openWho(){const b=$("#loginBody");UI.whoSel=getWho();
   b.innerHTML=`<header><div><div class="eyebrow">Leitung</div><h2 id="loginT">Wer bist du?</h2><p>Damit im Änderungsprotokoll steht, wer was gemacht hat.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
@@ -1076,11 +1102,11 @@ function openGift(){const wk=weekOf(),g=giftOf(wk.id),b=$("#giftBody");const fd=
   const head=`<header><div><div class="eyebrow">Geschenk der Woche · ${fd(wk.von)} – ${fd(wk.bis)}</div><h2 id="giftT">${g?"Schon geöffnet":"Ein Geschenk für dich?"}</h2><p>${g?"Jede Woche liegt ein neues Geschenk unter dem Baum. Nur wer es zuerst öffnet, bekommt den Inhalt.":(Date.now()>=NEU_AB?"Wer es diese Woche zuerst öffnet, bekommt zwischen $10.000 und $50.000 zur Auszahlung dazu.":"Wer es diese Woche zuerst öffnet, bekommt zwischen $10.000 und $75.000 zur Auszahlung dazu, mit Abzeichen sogar mehr.")}</p></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header>`;
   if(g){const a=giftAmt(g);b.innerHTML=head+`<div class="gbox open"><div class="gb"></div><div class="gv num">${a?money(a):"…"}</div></div><p style="text-align:center;margin:6px 0 2px"><b>${esc(g.name)}</b> war diese Woche schneller.</p>${perkTxt(g.kontoId,gMs(g.zeit))?`<p class="hint" style="text-align:center;color:#f4c95d">${esc(perkTxt(g.kontoId,gMs(g.zeit)))}</p>`:""}<p class="hint" style="text-align:center">Nächste Woche gibt es ein neues Geschenk.</p>`}
   else b.innerHTML=head+`<div class="gbox" id="gbx"><div class="gb"></div><div class="gl"></div><div class="bow"></div><div class="gv num"></div></div>
-    <label class="f" for="gName">Wer bist du?<select class="i" id="gName"><option value="">Name auswählen …</option>${sortedKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${k.id===meId()?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
+    <label class="f" for="gName">Wer bist du?<select class="i" id="gName"><option value="">${myKonten().length?"Name auswählen …":"Zuerst unten links anmelden"}</option>${myKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${k.id===meId()?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     <span class="hint" id="gPerk"></span><span class="status" id="gMsg"></span><button class="btn pri block" data-gift-open>${svg("star")}Geschenk öffnen</button>`;
   const gp=$("#gPerk");if(gp){const upd=()=>{const p=giftPerks($("#gName").value,Date.now()),pc=p.reduce((s,x)=>s+x[1],0);gp.innerHTML=pc?`<span style="color:#f4c95d">Deine Abzeichen geben dir <b>+${pc} %</b> aufs Geschenk (${p.map(x=>x[0]).join(", ")}).</span>`:""};upd();$("#gName").onchange=upd}
   const d=$("#giftDlg");if(!d.open)d.showModal()}
-async function doGift(){const kid=$("#gName").value,k=konto(kid),wk=weekOf(),msg=$("#gMsg");if(!k){msg.textContent="Wähle zuerst deinen Namen aus.";return}
+async function doGift(){const kid=$("#gName").value,k=konto(kid),wk=weekOf(),msg=$("#gMsg");if(!k){msg.textContent=myKonten().length?"Wähle zuerst deinen Namen aus.":"Melde dich zuerst unten links mit deinem Namen und Passwort an.";return}
   const bt=$("[data-gift-open]");bt.disabled=true;$("#gbx").classList.add("shake");msg.textContent="Wird geöffnet …";
   try{const ref=db.doc("geschenke/"+wk.id);const ex=await ref.get();if(ex.exists){openGift();return}
     const cl=HR.claimOnce?await HR.claimOnce("geschenke/"+wk.id,{kontoId:k.id,name:k.name}):(await ref.set({kontoId:k.id,name:k.name,zeit:"__NOW__"}),{won:true});if(!cl.won){openGift();return}
@@ -1282,7 +1308,7 @@ function secShow(html){const b=$("#giftBody");b.innerHTML=`<header><div><div cla
 const hhmm=t=>new Date(t).toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"});
 let secBusy=false;
 async function doSecret(ort){if(secBusy)return;const wk=weekOf(),kid=meId(),k=konto(kid);
-  if(!k){toast("Wähle zuerst unten links unter „Wer bist du?“ deinen Namen.");return}
+  if(!k){openMe();toast("Melde dich zuerst mit deinem Namen und Passwort an.");return}
   if(!db){toast("Gerade keine Verbindung.");return}
   secBusy=true;try{const ref=db.doc("geschenke/"+secId(wk.id));const ex=await ref.get();
     if(ex.exists){const g=ex.data()||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller. Ab Montag versteckt sich ein neues Secret.</p>`);render();return}
@@ -1497,7 +1523,7 @@ function liSubmit(){
   const li=UI.li||{},t=tarife(null),cl=liClosed();
   return`<div class="card pad stack" style="gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:14px">Screenshot einreichen</h3><span class="hint">${money(t.werbung)} pro Werbung · max. 1 pro Stunde</span></div>
     <div class="hint" style="line-height:1.6">Nach dem Schalten sofort einen <b>Vollbild-Screenshot</b> machen. Oben links muss eure Anzeige mit <b>Sender: dein Name</b> stehen, unten rechts Uhrzeit und Datum.</div>
-    <label class="f" for="liName">Dein Name<select class="i" id="liName"><option value="">Name auswählen …</option>${sortedKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${(UI.liKid||meId())===k.id?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
+    <label class="f" for="liName">Dein Name<select class="i" id="liName"><option value="">${myKonten().length?"Name auswählen …":"Zuerst unten links anmelden"}</option>${myKonten().filter(k=>!isAushilfe(k.id)).map(k=>`<option value="${k.id}"${(UI.liKid||meId())===k.id?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     ${cl?`<div class="note">${svg("clock")}<span>${LI_CLOSED_MSG}</span></div>`:""}<button class="copybig" data-act="li-pick-pub"${li.busy||cl?" disabled":""}${cl?' style="opacity:.45;cursor:not-allowed"':""}>${svg("image")}${li.busy?"Wird bearbeitet …":cl?"Einreichen geschlossen":"Screenshot einreichen"}</button>
     ${li.busy?`<div class="note">${svg("clock")}${li.msg?esc(li.msg)+" Beim ersten Mal dauert es etwas länger.":"Screenshot wird hochgeladen …"}</div>`:""}
     ${li.ok?`<div class="note" style="color:var(--l1);border-color:color-mix(in srgb,var(--l1) 40%,transparent)">${svg("check")}<span>${esc(li.ok)}</span></div>`:""}
@@ -1703,7 +1729,7 @@ function vKonten(){
    <td>${ren?`<div class="tact" style="flex-wrap:wrap"><input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:240px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label></div>`:
     `<span class="who">${avOf(k)}<span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
    ${W?`<td>${ren?`<input class="i mono" id="rp-${k.id}" value="${esc(p)}" inputmode="numeric" style="width:120px;padding:6px 10px" aria-label="Reisepassnummer">`:p?`<span class="tact"><span class="mono">${sh?esc(p):"••••"+esc(p.slice(-4))}</span><button class="btn sm ghost" data-act="pass" data-id="${k.id}">${sh?"Verbergen":"Anzeigen"}</button></span>`:`<span class="hint">–</span>`}</td>
-   <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button><button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
+   <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button><button class="btn sm ghost" data-act="pw-reset" data-id="${k.id}">${UI.confirmDel==="pw:"+k.id?"Wirklich?":"Passwort zurücksetzen"}</button><button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
   return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
   `<div class="card"><div class="toolbar"><input class="i" id="q" type="search" placeholder="Name suchen" value="${esc(UI.q)}" aria-label="Mitarbeiter durchsuchen">
    <div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
@@ -1721,7 +1747,7 @@ function vFeedback(){const f=UI.fb||(UI.fb={art:"vorschlag",kid:meId()});
   return page("feedback","Feedback & Vorschläge","Was läuft gut, was kann besser werden, was fehlt dir? Nur die Leitung kann es lesen.")+
   `<div class="g g2"><div class="card pad stack" style="gap:14px">
     ${f.ok?`<div class="note" style="color:var(--l1);border-color:color-mix(in srgb,var(--l1) 40%,transparent)">${svg("check")}<span>Danke! Dein ${esc((FB_ART.find(x=>x[0]===f.okArt)||FB_ART[0])[1])} ist bei der Leitung angekommen.</span></div>`:""}
-    <label class="f" for="fbName">Von<select class="i" id="fbName"><option value="">Anonym</option>${sortedKonten().map(k=>`<option value="${k.id}"${k.id===f.kid?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
+    <label class="f" for="fbName">Von<select class="i" id="fbName"><option value="">Anonym</option>${myKonten().map(k=>`<option value="${k.id}"${k.id===f.kid?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     <div class="f"><span>Art</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${FB_ART.map(([v,l])=>`<button type="button" class="btn${f.art===v?" pri":""}" data-act="fb-art" data-id="${v}" aria-pressed="${f.art===v}">${l}</button>`).join("")}</div></div>
     <label class="f" for="fbText">Deine Nachricht<textarea class="i" id="fbText" maxlength="1000" rows="6" placeholder="${f.art==="problem"?"Was funktioniert nicht oder stört dich?":f.art==="feedback"?"Wie findest du die Arbeit in der HR oder das Dashboard?":"Was sollten wir einführen oder ändern?"}">${esc(f.text||"")}</textarea></label>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="hint" id="fbCnt">${(f.text||"").length} / 1000</span><button class="btn pri" data-act="fb-send"${f.busy?" disabled":""}>${svg("check")}${f.busy?"Wird gesendet …":"Absenden"}</button></div>
@@ -1760,7 +1786,7 @@ document.addEventListener("click",async e=>{
   if(a==="login-save"){const k=konto(id),em=$("#nlE").value.trim(),pw=$("#nlP").value;if(!em||pw.length<6){toast("E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.");return}
     try{await HR.createLogin(id,em,pw);UI.newLogin=null;await db.collection("log").add({wer:whoName(),zeit:Date.now(),text:`Login für ${k.name} angelegt (${em})`,by:uid||""});toast(`Login für ${k.name} angelegt`)}catch(er){toast(authErr(er))}render();return}
   if(a==="login-del"){if(UI.confirmDel!==id){UI.confirmDel=id;render();return}UI.confirmDel=null;try{await HR.removeLogin(id);toast("Login entfernt")}catch{toast("Entfernen fehlgeschlagen.")}render();return}
-  if(a==="li-pick-pub"){if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}const kid=$("#liName")?.value;if(!kid){toast("Wähle zuerst deinen Namen aus.");return}UI.liKid=kid;$("#liPubIn").value="";$("#liPubIn").click();return}
+  if(a==="li-pick-pub"){if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}const kid=$("#liName")?.value;if(!kid){if(!myKonten().length){openMe();toast("Melde dich zuerst mit deinem Namen und Passwort an.")}else toast("Wähle zuerst deinen Namen aus.");return}UI.liKid=kid;$("#liPubIn").value="";$("#liPubIn").click();return}
   if(a==="li-force"){if(UI.liFile){const f=UI.liFile;UI.liFile=null;submitPublic(f,true)}return}
   if(a==="li-ki"){const n=S.nachweise.find(x=>x.id===id);if(n)kiCheck(n);return}
   if(a==="li-ki-all"){kiQueue(true);return}
@@ -1790,6 +1816,8 @@ document.addEventListener("click",async e=>{
     await write(()=>db.doc("feedback/"+id).update(a==="fb-done"?{status:"erledigt",erledigtVon:whoName()||"Leitung",erledigtZeit:Date.now()}:{status:"neu"}),null);return}
   if(a==="fb-del"){if(UI.confirmDel!==id){UI.confirmDel=id;render();return}UI.confirmDel=null;const x=(S.feedback||[]).find(y=>y.id===id);
     if(await write(()=>db.doc("feedback/"+id).delete(),`Feedback von ${x&&x.name||"Anonym"} gelöscht`))toast("Feedback gelöscht");return}
+  if(a==="pw-reset"){if(UI.confirmDel!=="pw:"+id){UI.confirmDel="pw:"+id;render();return}UI.confirmDel=null;const k=konto(id);
+    if(await write(()=>HR.maReset(id),`Passwort zurückgesetzt für ${k?k.name:id}`)){render();toast(`${k?k.name.split(" ")[0]:"Die Person"} kann jetzt ein neues Passwort festlegen`)}return}
   if(a==="sec-reset"){if(UI.confirmDel!=="sec:"+id){UI.confirmDel="sec:"+id;render();return}UI.confirmDel=null;const sf=secOf(id);
     if(await write(async()=>{await db.doc("geschenke/"+secId(id)).delete();await secEnsure(true)},`Secret der Woche neu versteckt${sf?` (war gefunden von ${sf.name}, ${money(secAmt(sf))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==secId(id));render();toast("Secret ist an einem neuen Ort versteckt und kann wieder gefunden werden")}return}
   if(a==="gift-reset"){if(UI.confirmDel!=="gift:"+id){UI.confirmDel="gift:"+id;render();return}UI.confirmDel=null;const g=giftOf(id);
@@ -1797,7 +1825,7 @@ document.addEventListener("click",async e=>{
   if(a==="zeit-save"){const o={};for(const [d,,l] of ZTAGE){const v=$("#zv-"+d).value,b=$("#zb-"+d).value;if(!!v!==!!b){toast(`${l}: Start und Ende eintragen oder beides leer lassen.`);return}o[d]=v&&b?[v,b]:null}
     if(await saveContent({zeiten:o,zeitenHinweis:$("#zHint").value.trim()},"Arbeitszeiten geändert")){UI.edit.zeiten=false;render();toast("Arbeitszeiten gespeichert")}return}
   if(["row-add","row-del","draft-clear","draft-save","paid","pay-copy","tarife-save"].includes(a)){await payoutAction(a,id);return}
-  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset"].includes(a))UI.confirmDel=null;
+  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset","pw-reset"].includes(a))UI.confirmDel=null;
   if(a==="rule-add"){c.richtlinien=[...collectRules(),{rolle:"Neue Rolle",punkte:[]}];render()}
   if(a==="rule-del"){const r=collectRules();r.splice(i,1);c.richtlinien=r;render()}
   if(a==="rule-save"){const r=collectRules();if(await saveContent({richtlinien:r},"HR Richtlinien aktualisiert")){UI.edit.richtlinien=false;render();toast("Richtlinien gespeichert")}}
@@ -2184,17 +2212,22 @@ function openLogin(){const b=$("#loginBody");
 const authErr=e=>({"auth/invalid-credential":"Das Passwort ist falsch.","auth/wrong-password":"Das Passwort ist falsch.","auth/user-not-found":"Das Passwort ist falsch.","auth/requires-recent-login":"Bitte einmal ab- und wieder anmelden, dann nochmal ändern.","auth/email-already-in-use":"Das Passwort wurde schon festgelegt. Melde dich normal an.","auth/weak-password":"Das Passwort braucht mindestens 6 Zeichen.","auth/too-many-requests":"Zu viele Versuche. Warte kurz und versuch es nochmal.","auth/operation-not-allowed":"In Firebase ist die Anmeldung mit E-Mail und Passwort noch nicht eingeschaltet."}[e&&e.code]||"Das hat nicht geklappt. Bitte nochmal versuchen.");
 $("#loginDlg").addEventListener("click",async e=>{
   if(e.target===e.currentTarget||e.target.closest("[data-close-login]")){$("#loginDlg").close();return}
-  const mp=e.target.closest("[data-me-pick]");if(mp){UI.meSel=mp.dataset.mePick;$("#meBox").innerHTML=$("#loginBody")._chips();$("#meFoot").innerHTML=meFoot();setTimeout(()=>$("#meP")?.focus(),30);return}
+  const mp=e.target.closest("[data-me-pick]");if(mp){const sel=mp.dataset.mePick;UI.meSel=sel;UI.zg=null;$("#meBox").innerHTML=$("#loginBody")._chips();$("#meFoot").innerHTML=meFoot();
+    if(!konto(sel)?.leitung){try{UI.zg=HR.zugang?await HR.zugang(sel):false}catch{UI.zg=false}if(UI.meSel!==sel)return;UI.zg=UI.zg||false;$("#meFoot").innerHTML=meFoot()}
+    setTimeout(()=>($("#meP")||$("#maP")||$("#maN1"))?.focus(),30);return}
+  if(e.target.closest("[data-ma-login]")){const pw=$("#maP").value;if(!pw){$("#lgMsg").textContent="Passwort eingeben.";return}$("#lgMsg").textContent="Melde an …";try{await HR.maLogin(UI.meSel,pw)}catch(er){$("#lgMsg").textContent=er&&er.code==="ma/no-pw"?"Für diesen Namen ist noch kein Passwort festgelegt.":authErr(er)}return}
+  if(e.target.closest("[data-ma-setup]")){const p1=$("#maN1").value,p2=$("#maN2").value;if(p1.length<6){$("#lgMsg").textContent="Das Passwort braucht mindestens 6 Zeichen.";return}if(p1!==p2){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}
+    $("#lgMsg").textContent="Lege dein Passwort fest …";try{await HR.maSetup(UI.meSel,p1)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
+  if(e.target.closest("[data-ma-logout]")){await HR.logout();return}
   if(e.target.closest("[data-me-login]")){const pw=$("#meP").value;if(!pw){$("#lgMsg").textContent="Passwort eingeben.";return}$("#lgMsg").textContent="Melde an …";setWho(UI.meSel);setMe(UI.meSel);
     try{await HR.login(pw)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
-  if(e.target.closest("[data-me-save]")){if(!UI.meSel){toast("Wähle deinen Namen oder „Ich bin Gast“.");return}setMe(UI.meSel);applyMe();$("#loginDlg").close();UI.fb=null;render();toast(`Hallo ${konto(UI.meSel)?.name.split(" ")[0]||""}!`);return}
-  if(e.target.closest("[data-me-gast]")){if(!getMe()||e.target.closest(".row"))setMe("gast");applyMe();$("#loginDlg").close();render();return}
+    if(e.target.closest("[data-me-gast]")){if(!getMe()||e.target.closest(".row"))setMe("gast");applyMe();$("#loginDlg").close();render();return}
   const wp=e.target.closest("[data-who-pick]");if(wp){UI.whoSel=wp.dataset.whoPick;$("#whoBox").innerHTML=whoPicker(UI.whoSel);return}
   if(e.target.closest("[data-who-save]")){if(!UI.whoSel){$("#lgMsg").textContent="Wähle aus, wer du bist.";return}setWho(UI.whoSel);applyWho();$("#loginDlg").close();render();toast(`Angemeldet als ${whoName()}`);return}
   if(e.target.closest("[data-login]")){if(!UI.whoSel){$("#lgMsg").textContent="Wähle zuerst aus, wer du bist.";return}setWho(UI.whoSel);$("#lgMsg").textContent="Melde an …";try{await HR.login($("#lgP").value)}catch(er){$("#lgMsg").textContent=authErr(er)}}
   if(e.target.closest("[data-setup]")){if($("#suP").value!==$("#suP2").value){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}$("#lgMsg").textContent="Richte ein und übernehme die Daten …";try{await HR.setup($("#suP").value)}catch(er){$("#lgMsg").textContent=authErr(er)}}
 });
-document.addEventListener("click",e=>{if(HR.uid&&e.target.closest("#meName")){openWho();return}if(!HR.uid&&e.target.closest("#meName")&&S.konten.length){openMe();return}const a=e.target.closest("[data-auth]");if(a){if(HR.uid){setMe("gast");HR.logout()}else if(S.konten.length)openMe();else openLogin();return}
+document.addEventListener("click",e=>{if(HR.uid&&e.target.closest("#meName")){openWho();return}if(!HR.uid&&e.target.closest("#meName")&&S.konten.length){openMe();return}const a=e.target.closest("[data-auth]");if(a){if(HR.uid||HR.maLow){setMe("gast");HR.logout()}else if(S.konten.length)openMe();else openLogin();return}
   const z=e.target.closest("[data-zoom]");if(z){e.preventDefault();$("#zoomImg").src=imgSrc(z.dataset.zoom);$("#zoom").hidden=false;return}
   if(e.target.closest("#zoom"))$("#zoom").hidden=true},true);
 $("#loginDlg").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("input")){e.preventDefault();($("[data-me-login]")||$("[data-login]")||$("[data-setup]"))?.click()}});
