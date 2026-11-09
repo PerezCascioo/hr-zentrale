@@ -1308,7 +1308,8 @@ const SEC_TABS=["ueberblick","richtlinien","kleidung","auszahlungen","werbung","
 /* 28 mögliche Orte: Titel und Text jedes Bereichs, jeder Menüpunkt, Logo, Fusszeile, Einstellungen, 4 Stellen im Sternenhimmel */
 const SEC_SPOTS=[...SEC_TABS.flatMap(t=>[t+"-titel",t+"-text","nav-"+t]),"logo","foot","set","sky-1","sky-2","sky-3","sky-4"];
 /* 10 verschiedene Objekte an zufälligen Orten, nur eins hat das Geld. Jedes ist pro Stunde nur 12 Minuten sichtbar. */
-const SEC_SHOW=12,SEC_N=10;
+const SEC_SHOW=12,SEC_N=100;
+const SEC_DYN=["h2","h3","li","th","label","b",".hint",".pill"];
 const SEC_ICONS={
  schluessel:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
  muenze:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
@@ -1344,6 +1345,7 @@ function secPlace(){document.querySelectorAll(".hsec").forEach(x=>{const p=x.par
       if(sp.startsWith("sky")){if(sky)sky.insertAdjacentHTML("beforeend",`<span class="secpos" style="position:absolute;left:${+it.x||50}%;top:${+it.y||50}%">${secStar(it)}</span>`);continue}
       if(sp.startsWith("nav-"))el=document.querySelector(`#nav .nav[data-tab="${sp.slice(4)}"]`);
       else if(sp==="logo")el=$("#secLogo");else if(sp==="foot")el=$("#secFoot");else if(sp==="set")el=$("#secSet");
+      else if(sp.startsWith("dyn|")){const[,tb,sel,n]=sp.split("|");if(tb===t){const all=document.querySelectorAll("#view "+sel);el=all[+n]||null}}
       else{const[tb,part]=sp.split("-");if(tb===t)el=$(part==="titel"?"#view .phead h1":"#view .phead p")}
       if(el)el.insertAdjacentHTML("beforeend",secStar(it))}}
   if(UI.admin&&live){secEnsure();if(!S._zgOn&&db){S._zgOn=1;try{db.collection("zugang").onSnapshot(q=>{const m={};q.docs.forEach(d=>m[d.id]=d.data());S.zugang=m;if(UI.tab==="konten")renderSoon()},()=>{S._zgOn=0})}catch{S._zgOn=0}}}}
@@ -1351,9 +1353,13 @@ setInterval(()=>{try{secPlace()}catch{}},20000);
 /* Leitung: jeden Montag (und bei „Neu verstecken“) alles neu auslosen: Objekte, Orte, Zeiten und welches echt ist */
 let secEnsured="";
 function secRoll(wid){const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-  const spots=shuf(SEC_SPOTS).slice(0,SEC_N),typs=shuf(Object.keys(SEC_ICONS));
-  const items=spots.map((ort,i)=>({id:"o"+Math.random().toString(36).slice(2,9),typ:typs[i%typs.length],ort:ort.startsWith("sky")?"sky":ort,off:Math.floor(Math.random()*60),x:8+Math.floor(Math.random()*80),y:12+Math.floor(Math.random()*74)}));
-  const real=items[Math.floor(Math.random()*items.length)];return{pub:{wid,items},cfg:{wid,ort:real.id,off:real.off}}}
+  const typs=Object.keys(SEC_ICONS),rnd=n=>Math.floor(Math.random()*n),mk=ort=>({id:"o"+Math.random().toString(36).slice(2,9),typ:typs[rnd(typs.length)],ort,off:rnd(60),x:6+rnd(86),y:10+rnd(78)});
+  /* Das echte liegt an einem Ort, den alle sehen können; die anderen 99 überall verteilt */
+  const real=mk(SEC_SPOTS[rnd(SEC_SPOTS.length)]);if(real.ort.startsWith("sky"))real.ort="sky";
+  const items=[real];while(items.length<SEC_N){const r=Math.random();let ort;
+    if(r<.3)ort="sky";else if(r<.6){ort=SEC_SPOTS[rnd(SEC_SPOTS.length)];if(ort.startsWith("sky"))ort="sky"}
+    else ort=`dyn|${SEC_TABS[rnd(SEC_TABS.length)]}|${SEC_DYN[rnd(SEC_DYN.length)]}|${rnd(12)}`;items.push(mk(ort))}
+  return{pub:{wid,items:shuf(items)},cfg:{wid,ort:real.id,off:real.off}}}
 async function secEnsure(force){const wk=weekOf();if(wk.von<NEU_AB||!db||(!force&&secEnsured===wk.id))return;secEnsured=wk.id;
   try{const pd=await db.doc("hr/secret").get(),pub=pd.exists?pd.data()||{}:{};const cd=await db.doc("config/secret").get(),cfg=cd.exists?cd.data()||{}:{};
     if(!force&&pub.wid===wk.id&&cfg.wid===wk.id&&Array.isArray(pub.items)&&pub.items.some(x=>x.id===cfg.ort))return;
