@@ -1011,7 +1011,7 @@ const setMe=v=>{try{localStorage.setItem("hrz-me",v)}catch{}};
 const maId=()=>HR.maLow?(S.konten.find(k=>String(k.id).toLowerCase()===HR.maLow)?.id||""):"";
 const meId=()=>HR.uid?getWho():maId();
 /* Wer darf in Formularen ausgewählt werden: Leitung alle, Mitarbeiter nur sich selbst */
-const myKonten=()=>HR.uid?sortedKonten():maId()?[konto(maId())]:[];
+const myKonten=()=>{const k=konto(meId());return k?[k]:[]};
 /* Gemeinsames Leitungs-Passwort abschalten, sobald alle ihr eigenes Passwort gesetzt haben */
 let pwAusChecked=false;
 async function leitungPwCheck(){if(pwAusChecked||!HR.leitKid||!db||!S.konten.length||S.content?.leitungPwAus)return;pwAusChecked=true;
@@ -1020,13 +1020,16 @@ async function leitungPwCheck(){if(pwAusChecked||!HR.leitKid||!db||!S.konten.len
     toast("Alle haben jetzt ein eigenes Passwort. Das gemeinsame Leitungs-Passwort ist abgeschaltet.")}catch{}}
 let pwAsked=false;
 async function pwStartCheck(){const kid=HR.leitKid||maId();if(pwAsked||!kid||!HR.zugang)return;pwAsked=true;try{const z=await HR.zugang(kid);if(z&&z.start)openPwChange(true)}catch{}}
-function openPwChange(first){const b=$("#loginBody");b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${first?"Leg dein eigenes Passwort fest":"Passwort ändern"}</h2><p>${first?"Du hast dich mit dem Startpasswort der Leitung angemeldet. Wähle jetzt ein eigenes, das nur du kennst.":"Mindestens 6 Zeichen."}</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
+function openPwChange(first){const b=$("#loginBody");b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${first?"Leg dein eigenes Passwort fest":"Passwort ändern"}</h2><p>${first?"Du hast dich mit dem Startpasswort der Leitung angemeldet. Bevor du weitermachen kannst, wähle ein eigenes Passwort, das nur du kennst (mindestens 6 Zeichen).":"Mindestens 6 Zeichen."}</p></div>${first?"":`<button class="ibtn" data-close-login aria-label="Schließen">×</button>`}</header>
   <div class="stack" style="gap:8px">${first?"":`<label class="f" for="pwOld">Aktuelles Passwort<input class="i" id="pwOld" type="password" autocomplete="current-password"></label>`}
   <label class="f" for="pwN1">Neues Passwort<input class="i" id="pwN1" type="password" autocomplete="new-password"></label>
   <label class="f" for="pwN2">Neues Passwort wiederholen<input class="i" id="pwN2" type="password" autocomplete="new-password"></label><span class="status" id="lgMsg"></span>
-  <div class="row" style="gap:8px"><button class="btn" data-close-login style="flex:1">${first?"Später":"Abbrechen"}</button><button class="btn pri" data-pw-save style="flex:1">Speichern</button></div></div>`;
-  const d=$("#loginDlg");if(!d.open)d.showModal();setTimeout(()=>($("#pwOld")||$("#pwN1"))?.focus(),50)}
+  <div class="row" style="gap:8px">${first?`<button class="btn" data-ma-logout style="flex:1">Abmelden</button>`:`<button class="btn" data-close-login style="flex:1">Abbrechen</button>`}<button class="btn pri" data-pw-save style="flex:1">Speichern</button></div></div>`;
+  const d=$("#loginDlg");d.dataset.force=first?"1":"";if(!d.open)d.showModal();setTimeout(()=>($("#pwOld")||$("#pwN1"))?.focus(),50)}
 /* Umstellung auf Passwörter: alte Namensauswahl ohne Passwort verwerfen und zur Anmeldung auffordern */
+/* Startpasswort-Wechsel lässt sich nicht wegklicken */
+try{$("#loginDlg").addEventListener("cancel",e=>{if(e.currentTarget.dataset.force)e.preventDefault()})}catch{}
+document.addEventListener("change",e=>{if(e.target&&e.target.id==="fbName"&&e.target.value==="__login"){e.target.value="";openMe();toast("Melde dich an, um Feedback mit deinem Namen zu senden.")}});
 let oldMeDone=false;
 function oldMeCheck(){if(oldMeDone||HR.uid||HR.maLow||!S.konten.length)return;oldMeDone=true;const m=getMe();if(m&&m!=="gast"&&konto(m)){setMe("");setTimeout(()=>{try{openMe();toast("HR Zentral hat jetzt Passwörter. Bitte melde dich neu an.")}catch{}},400)}}
 function applyMe(){if(HR.maLow)setTimeout(pwStartCheck,600);try{oldMeCheck()}catch{}if(HR.uid)return;let k=maId()?konto(maId()):null;const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
@@ -1821,7 +1824,7 @@ function vFeedback(){const f=UI.fb||(UI.fb={art:"vorschlag",kid:meId()});
   return page("feedback","Feedback & Vorschläge","Was läuft gut, was kann besser werden, was fehlt dir? Nur die Leitung kann es lesen.")+
   `<div class="g g2"><div class="card pad stack" style="gap:14px">
     ${f.ok?`<div class="note" style="color:var(--l1);border-color:color-mix(in srgb,var(--l1) 40%,transparent)">${svg("check")}<span>Danke! Dein ${esc((FB_ART.find(x=>x[0]===f.okArt)||FB_ART[0])[1])} ist bei der Leitung angekommen.</span></div>`:""}
-    <label class="f" for="fbName">Von<select class="i" id="fbName"><option value="">Anonym</option>${myKonten().map(k=>`<option value="${k.id}"${k.id===f.kid?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
+    <label class="f" for="fbName">Von<select class="i" id="fbName"><option value="">Anonym</option>${myKonten().length?"":`<option value="__login">Mit meinem Namen (anmelden) …</option>`}${myKonten().map(k=>`<option value="${k.id}"${k.id===f.kid?" selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     <div class="f"><span>Art</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${FB_ART.map(([v,l])=>`<button type="button" class="btn${f.art===v?" pri":""}" data-act="fb-art" data-id="${v}" aria-pressed="${f.art===v}">${l}</button>`).join("")}</div></div>
     <label class="f" for="fbText">Deine Nachricht<textarea class="i" id="fbText" maxlength="1000" rows="6" placeholder="${f.art==="problem"?"Was funktioniert nicht oder stört dich?":f.art==="feedback"?"Wie findest du die Arbeit in der HR oder das Dashboard?":"Was sollten wir einführen oder ändern?"}">${esc(f.text||"")}</textarea></label>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="hint" id="fbCnt">${(f.text||"").length} / 1000</span><button class="btn pri" data-act="fb-send"${f.busy?" disabled":""}>${svg("check")}${f.busy?"Wird gesendet …":"Absenden"}</button></div>
@@ -2294,7 +2297,7 @@ function openLogin(){const b=$("#loginBody");
   $("#loginDlg").showModal();setTimeout(()=>($("#lgP")||$("#suP"))?.focus(),50)}
 const authErr=e=>({"auth/invalid-credential":"Das Passwort ist falsch.","auth/wrong-password":"Das Passwort ist falsch.","auth/user-not-found":"Das Passwort ist falsch.","auth/requires-recent-login":"Bitte einmal ab- und wieder anmelden, dann nochmal ändern.","auth/email-already-in-use":"Das Passwort wurde schon festgelegt. Melde dich normal an.","auth/weak-password":"Das Passwort braucht mindestens 6 Zeichen.","auth/too-many-requests":"Zu viele Versuche. Warte kurz und versuch es nochmal.","auth/operation-not-allowed":"In Firebase ist die Anmeldung mit E-Mail und Passwort noch nicht eingeschaltet."}[e&&e.code]||"Das hat nicht geklappt. Bitte nochmal versuchen.");
 $("#loginDlg").addEventListener("click",async e=>{
-  if(e.target===e.currentTarget||e.target.closest("[data-close-login]")){$("#loginDlg").close();return}
+  if((e.target===e.currentTarget&&!e.currentTarget.dataset.force)||e.target.closest("[data-close-login]")){$("#loginDlg").close();return}
   const mp=e.target.closest("[data-me-pick]");if(mp){const sel=mp.dataset.mePick;UI.meSel=sel;UI.zg=null;$("#meBox").innerHTML=$("#loginBody")._chips();$("#meFoot").innerHTML=meFoot();
     try{UI.zg=HR.zugang?await HR.zugang(sel):false}catch{UI.zg=false}if(UI.meSel!==sel)return;UI.zg=UI.zg&&UI.zg.uid?UI.zg:false;$("#meFoot").innerHTML=meFoot()
     setTimeout(()=>($("#meP")||$("#maP")||$("#maN1"))?.focus(),30);return}
@@ -2306,7 +2309,7 @@ $("#loginDlg").addEventListener("click",async e=>{
   if(e.target.closest("[data-pw-change]")){openPwChange(false);return}
   if(e.target.closest("[data-pw-save]")){const o=$("#pwOld")?.value||"",p1=$("#pwN1").value,p2=$("#pwN2").value;if(p1.length<6){$("#lgMsg").textContent="Das Passwort braucht mindestens 6 Zeichen.";return}if(p1!==p2){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}
     if($("#pwOld")&&!o){$("#lgMsg").textContent="Gib dein aktuelles Passwort ein.";return}$("#lgMsg").textContent="Speichere …";
-    try{await HR.maChangePw(HR.leitKid||maId(),o,p1);$("#loginDlg").close();toast("Neues Passwort gespeichert")}catch(er){$("#lgMsg").textContent=authErr(er)}return}
+    try{await HR.maChangePw(HR.leitKid||maId(),o,p1);const d=$("#loginDlg");d.dataset.force="";d.close();toast("Neues Passwort gespeichert")}catch(er){$("#lgMsg").textContent=authErr(er)}return}
   if(e.target.closest("[data-me-login]")){const pw=$("#meP").value;if(!pw){$("#lgMsg").textContent="Passwort eingeben.";return}$("#lgMsg").textContent="Melde an …";setWho(UI.meSel);setMe(UI.meSel);
     try{await HR.login(pw)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
     if(e.target.closest("[data-me-gast]")){if(!getMe()||e.target.closest(".row"))setMe("gast");applyMe();$("#loginDlg").close();render();return}

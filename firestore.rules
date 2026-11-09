@@ -20,7 +20,10 @@ service cloud.firestore {
     // Ist der angemeldete Benutzer dieser Mitarbeiter? (eigenes Passwort, verknüpft in zugang/<konto>)
     function zugangDoc(kid) { return /databases/$(database)/documents/zugang/$(kid); }
     function me(kid) {
-      return isLeitung() || (request.auth != null && kid is string && exists(zugangDoc(kid)) && get(zugangDoc(kid)).data.uid == request.auth.uid);
+      return isLeitung() || (request.auth != null && kid is string && exists(zugangDoc(kid))
+        && get(zugangDoc(kid)).data.uid == request.auth.uid
+        // Mit dem Startpasswort der Leitung geht noch nichts, erst nach dem Ändern
+        && get(zugangDoc(kid)).data.get('start', false) != true);
     }
 
     // Mitarbeiter-Passwörter: Die Leitung vergibt Startpasswörter (legt das Konto an).
