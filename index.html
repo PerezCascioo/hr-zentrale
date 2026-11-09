@@ -565,10 +565,10 @@ dialog{background:linear-gradient(180deg,rgba(30,26,38,.92),rgba(18,16,24,.92));
 /* Wöchentliches Geschenk */
 .xgifts{display:none}
 /* Secret der Woche: absichtlich fast unsichtbar */
-.hsec{display:inline-grid;place-items:center;width:18px;height:18px;vertical-align:middle;margin-left:4px;padding:0;border:0;background:none;color:var(--fg2);opacity:.16;cursor:default;animation:hsec 23s ease-in-out infinite;transition:opacity .4s}
-.hsec svg{width:8px;height:8px}
-.hsec:hover,.hsec:focus-visible{opacity:.45}
-@keyframes hsec{0%,96%,100%{opacity:.16}98%{opacity:.4}}
+.hsec{display:inline-grid;place-items:center;width:18px;height:18px;vertical-align:middle;margin-left:4px;padding:0;border:0;background:none;color:var(--fg2);opacity:.11;cursor:default;animation:hsec 29s ease-in-out infinite;transition:opacity .4s}
+.hsec svg{width:9px;height:9px}
+.hsec:hover,.hsec:focus-visible{opacity:.32}
+@keyframes hsec{0%,97%,100%{opacity:.11}98.5%{opacity:.26}}
 .secsky{position:fixed;inset:0;z-index:2;pointer-events:none}
 .secsky .hsec{position:absolute;pointer-events:auto;margin:0}
 .secslot{display:inline-flex;align-items:center}
@@ -1307,10 +1307,23 @@ const giftOn=()=>Date.now()<NEU_AB||Date.now()>=GIFT_AB;
 const SEC_TABS=["ueberblick","richtlinien","kleidung","auszahlungen","werbung","konten","feedback"];
 /* 28 mögliche Orte: Titel und Text jedes Bereichs, jeder Menüpunkt, Logo, Fusszeile, Einstellungen, 4 Stellen im Sternenhimmel */
 const SEC_SPOTS=[...SEC_TABS.flatMap(t=>[t+"-titel",t+"-text","nav-"+t]),"logo","foot","set","sky-1","sky-2","sky-3","sky-4"];
-/* Jeder Stern ist pro Stunde nur 12 Minuten sichtbar, zu einer anderen Zeit als die anderen */
-const SEC_SHOW=12;
-const secOff=(wid,spot)=>secHash(wid+"|"+spot)%60;
-const secVisible=(spot,d=new Date())=>(d.getUTCMinutes()+secOff(weekOf().id,spot))%60<SEC_SHOW;
+/* 10 verschiedene Objekte an zufälligen Orten, nur eins hat das Geld. Jedes ist pro Stunde nur 12 Minuten sichtbar. */
+const SEC_SHOW=12,SEC_N=10;
+const SEC_ICONS={
+ schluessel:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+ muenze:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
+ lupe:'<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/>',
+ fingerabdruck:'<path d="M12 4a7 7 0 0 0-7 7v3M19 11a7 7 0 0 0-3-5.7M9 20c1-2 1-5 1-9a2 2 0 0 1 4 0c0 3 0 6-1 9M17 19c.5-2 .7-4 .7-7"/>',
+ marke:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/>',
+ diamant:'<path d="M6 4h12l3 5-9 11L3 9zM3 9h18"/>',
+ kleeblatt:'<circle cx="9" cy="9" r="3"/><circle cx="15" cy="9" r="3"/><circle cx="12" cy="14" r="3"/><path d="M12 17v4"/>',
+ brief:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 7l9 6 9-6"/>',
+ stern:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+ gluehbirne:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+ tasse:'<path d="M5 8h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17"/>',
+ ordner:'<path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'};
+const secVisible=(it,d=new Date())=>(d.getUTCMinutes()+(+it.off||0))%60<SEC_SHOW;
+const secItems=()=>{const p=S.secPub;return p&&p.wid===weekOf().id&&Array.isArray(p.items)?p.items:[]};
 const SEC_STAR='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.2H22l-6.2 4.5 2.4 7.3-6.2-4.5-6.2 4.5 2.4-7.3L2 9.2h7.6z"/></svg>';
 const secHash=x=>{let h=2166136261;for(const c of String(x))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0};
 const secId=wid=>"secret-"+wid;
@@ -1323,20 +1336,28 @@ const secAmt=g=>{const ms=gMs(g&&g.zeit);return ms?10000+(secHash(g.id+":"+ms)%4
 const SEC_WAIT=30*6e4;
 function secOpen(){const wk=weekOf();return wk.von>=NEU_AB&&Date.now()>=NEU_AB&&live&&!secOf(wk.id)}
 const secBtn=()=>"";
-const secStar=spot=>`<button type="button" class="hsec" data-sec="${spot}" aria-label="Stern">${SEC_STAR}</button>`;
+const secStar=it=>`<button type="button" class="hsec" data-sec="${esc(it.id)}" aria-label="Objekt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SEC_ICONS[it.typ]||SEC_ICONS.stern}</svg></button>`;
 function secPlace(){document.querySelectorAll(".hsec").forEach(x=>{const p=x.parentElement;x.remove();if(p&&p.classList.contains("secpos"))p.remove()});
-  const on=secOpen();if(on){const wid=weekOf().id,vis=sp=>secVisible(sp),put=(el,sp)=>{if(el&&vis(sp))el.insertAdjacentHTML("beforeend",secStar(sp))};
-    const t=UI.tab;if(SEC_TABS.includes(t)){put($("#view .phead h1"),t+"-titel");put($("#view .phead p"),t+"-text")}
-    SEC_TABS.forEach(x=>put(document.querySelector(`#nav .nav[data-tab="${x}"]`),"nav-"+x));
-    put($("#secLogo"),"logo");put($("#secFoot"),"foot");put($("#secSet"),"set");
-    const sky=$("#secSky");if(sky)[1,2,3,4].forEach(i=>{const sp="sky-"+i;if(!vis(sp))return;const h=secHash(wid+sp);sky.insertAdjacentHTML("beforeend",`<span class="secpos" style="position:absolute;left:${8+h%80}%;top:${12+(h>>8)%74}%">${secStar(sp)}</span>`)})}
+  if(!S._secOn&&db&&live){S._secOn=1;try{db.doc("hr/secret").onSnapshot(d=>{S.secPub=d.exists?d.data():null;renderSoon()},()=>{S._secOn=0})}catch{S._secOn=0}}
+  if(secOpen()){const t=UI.tab,sky=$("#secSky");
+    for(const it of secItems()){if(!secVisible(it))continue;const sp=String(it.ort||"");let el=null;
+      if(sp.startsWith("sky")){if(sky)sky.insertAdjacentHTML("beforeend",`<span class="secpos" style="position:absolute;left:${+it.x||50}%;top:${+it.y||50}%">${secStar(it)}</span>`);continue}
+      if(sp.startsWith("nav-"))el=document.querySelector(`#nav .nav[data-tab="${sp.slice(4)}"]`);
+      else if(sp==="logo")el=$("#secLogo");else if(sp==="foot")el=$("#secFoot");else if(sp==="set")el=$("#secSet");
+      else{const[tb,part]=sp.split("-");if(tb===t)el=$(part==="titel"?"#view .phead h1":"#view .phead p")}
+      if(el)el.insertAdjacentHTML("beforeend",secStar(it))}}
   if(UI.admin&&live){secEnsure();if(!S._zgOn&&db){S._zgOn=1;try{db.collection("zugang").onSnapshot(q=>{const m={};q.docs.forEach(d=>m[d.id]=d.data());S.zugang=m;if(UI.tab==="konten")renderSoon()},()=>{S._zgOn=0})}catch{S._zgOn=0}}}}
 setInterval(()=>{try{secPlace()}catch{}},20000);
-/* Leitung: jeden Montag automatisch einen neuen geheimen Ort auslosen */
+/* Leitung: jeden Montag (und bei „Neu verstecken“) alles neu auslosen: Objekte, Orte, Zeiten und welches echt ist */
 let secEnsured="";
+function secRoll(wid){const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+  const spots=shuf(SEC_SPOTS).slice(0,SEC_N),typs=shuf(Object.keys(SEC_ICONS));
+  const items=spots.map((ort,i)=>({id:"o"+Math.random().toString(36).slice(2,9),typ:typs[i%typs.length],ort:ort.startsWith("sky")?"sky":ort,off:Math.floor(Math.random()*60),x:8+Math.floor(Math.random()*80),y:12+Math.floor(Math.random()*74)}));
+  const real=items[Math.floor(Math.random()*items.length)];return{pub:{wid,items},cfg:{wid,ort:real.id,off:real.off}}}
 async function secEnsure(force){const wk=weekOf();if(wk.von<NEU_AB||!db||(!force&&secEnsured===wk.id))return;secEnsured=wk.id;
-  try{const r=db.doc("config/secret"),d=await r.get(),o=d.exists?d.data()||{}:{};if(!force&&o.wid===wk.id)return;
-    let ort;do{ort=SEC_SPOTS[Math.floor(Math.random()*SEC_SPOTS.length)]}while(ort===o.ort);await r.set({wid:wk.id,ort,off:secOff(wk.id,ort)})}catch{secEnsured=""}}
+  try{const pd=await db.doc("hr/secret").get(),pub=pd.exists?pd.data()||{}:{};const cd=await db.doc("config/secret").get(),cfg=cd.exists?cd.data()||{}:{};
+    if(!force&&pub.wid===wk.id&&cfg.wid===wk.id&&Array.isArray(pub.items)&&pub.items.some(x=>x.id===cfg.ort))return;
+    const r=secRoll(wk.id);await db.doc("config/secret").set(r.cfg);await db.doc("hr/secret").set(r.pub);S.secPub=r.pub}catch{secEnsured=""}}
 function pwShow(list){const txt=list.map(([n,p])=>`${n}: ${p}`).join("\n");const b=$("#giftBody");
   b.innerHTML=`<header><div><div class="eyebrow">Startpasswörter</div><h2>Jetzt verschicken</h2><p class="hint">Schick jedem sein Passwort privat. Beim ersten Anmelden wird man aufgefordert, ein eigenes festzulegen. Diese Liste wird nicht gespeichert.</p></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header>
   <textarea class="i mono" id="pwList" readonly style="min-height:${Math.min(320,60+list.length*22)}px">${esc(txt)}</textarea><button class="btn pri" type="button" id="pwCopy">Alles kopieren</button>`;
@@ -1353,7 +1374,7 @@ async function doSecret(ort){if(secBusy)return;const wk=weekOf(),kid=meId(),k=ko
     if(last&&Date.now()-last<SEC_WAIT){secShow(`<h2>Noch warten</h2><p class="hint">${esc(k.name)} hatte gerade einen Versuch. Der nächste ist ab <b>${hhmm(last+SEC_WAIT)} Uhr</b> möglich.</p>`);return}
     try{await vr.set({ort,wid:wk.id,t:"__NOW__"})}catch(e){secShow(`<h2>Noch warten</h2><p class="hint">Pro Person ist nur alle 30 Minuten ein Versuch möglich.</p>`);return}
     let cl;try{cl=await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name,ort})}
-    catch(e){secShow(`<h2>Hier ist nichts</h2><p class="hint">Das war nicht das echte Secret. Nächster Versuch für ${esc(k.name)} ab <b>${hhmm(Date.now()+SEC_WAIT)} Uhr</b>.</p>`);return}
+    catch(e){secShow(`<h2>Hier ist nichts</h2><p class="hint">Das war nicht das echte Secret, hier war nichts drin. Nächster Versuch für ${esc(k.name)} ab <b>${hhmm(Date.now()+SEC_WAIT)} Uhr</b>.</p>`);return}
     if(!cl.won){const o=cl.data||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(o.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
     if(!S.geschenke.some(x=>x.id===g.id))S.geschenke=[g,...S.geschenke];const a=secAmt(g);
