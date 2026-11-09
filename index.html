@@ -1442,6 +1442,16 @@ function vGiftAdmin(wk){if(!UI.admin)return"";const g=giftOf(wk.id),sf=secOf(wk.
   const sec=wk.von>=NEU_AB&&wk.id===weekOf().id||sf?`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">${sf?`Secret der Woche: <b>${esc(sf.name)}</b> hat ${secAmt(sf)?money(secAmt(sf)):"…"} gefunden.`:"Secret der Woche: noch nicht gefunden. Falls jemand den Ort kennt, hier neu verstecken."}</span><button class="btn sm danger" data-act="sec-reset" data-id="${wk.id}">${UI.confirmDel==="sec:"+wk.id?"Wirklich neu verstecken?":"Secret neu verstecken"}</button></div>`:"";
   if(!g)return sec;const a=giftAmt(g);
   return sec+`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">Geschenk der Woche: <b>${esc(g.name)}</b> hat ${a?money(a):"…"} gewonnen.</span><button class="btn sm danger" data-act="gift-reset" data-id="${wk.id}">${UI.confirmDel==="gift:"+wk.id?"Wirklich zurücksetzen?":"Geschenk zurücksetzen"}</button></div>`}
+/* Nur für Perez Cascio: HR-Budget (Standard 250.000 pro Woche), alles darüber zahlt er selbst */
+const isPerez=()=>{const k=konto(meId());return !!k&&/^perez cascio$/i.test(String(k.name).trim())};
+function vBudget(total){if(!isPerez())return"";const b=+(S.content?.hrBudget)||250000,over=Math.max(0,total-b),rest=Math.max(0,b-total),pct=Math.min(100,b?total/b*100:0);
+  return`<div class="card" style="margin-top:14px"><div class="ch"><h3>Budget dieser Woche</h3><span class="hint">Nur für dich sichtbar</span></div><div class="pad stack" style="gap:12px">
+   <div class="g g3" style="gap:10px">
+    <div><div class="hint">Budget von der HR</div><div class="num" style="font-size:22px;font-weight:800">${money(b)}</div></div>
+    <div><div class="hint">Auszahlung gesamt</div><div class="num" style="font-size:22px;font-weight:800">${money(total)}</div></div>
+    <div><div class="hint">${over?"Aus eigener Tasche":"Noch im Budget"}</div><div class="num" style="font-size:22px;font-weight:800;color:${over?"var(--l3)":"var(--l1)"}">${money(over||rest)}</div></div></div>
+   <div class="bar" style="height:10px" role="img" aria-label="${Math.round(pct)} % vom Budget verbraucht"><i style="width:${pct}%;background:${over?"var(--l3)":"var(--l1)"}"></i></div>
+   <div class="row" style="gap:8px;align-items:flex-end"><label class="f" for="hrBud" style="flex:0 1 200px">Budget pro Woche<input class="i num" id="hrBud" inputmode="numeric" value="${b}"></label><button class="btn sm" data-act="bud-save">Speichern</button></div></div></div>`}
 function vAuszahlungen(){
   const c=S.content||{},wk=selWeek(),w=weekDoc(wk.id),ed=UI.edit.tarife,t=ed?{...TDEF,...(c.tarife||{})}:tarife(w);
   if(UI.per&&UI.per!=="woche")return page("auszahlungen","Auszahlungen",UI.per==="3m"?"Alle Auszahlungen der letzten 3 Monate.":"Alle Auszahlungen seit Beginn.")+periodBar(wk)+vAggregate();
@@ -1461,7 +1471,7 @@ function vAuszahlungen(){
    <div class="card kpi"><div class="top"><span class="lab">Mitarbeiter</span><span class="ic">${svg("users")}</span></div><div class="v num">${rows.length}</div><div class="sub">bekommen eine Auszahlung</div></div>
    <div class="card kpi"><div class="top"><span class="lab">Schon ausgezahlt</span><span class="ic">${svg("check")}</span></div><div class="v num">${paidN}<small> / ${rows.length}</small></div><div class="bar"><i style="width:${total?paidSum/total*100:0}%;background:var(--l1)"></i></div></div>
   </div>
-  ${vVergleich(wk,rows)}${vGiftAdmin(wk)}
+  ${vVergleich(wk,rows)}${vBudget(total)}${vGiftAdmin(wk)}
   <div class="card" style="margin-top:14px"><div class="ch"><div><h3>Auszahlungsliste</h3><span class="hint" style="${sun?"color:var(--acc);font-weight:700":""}">${sun?"Heute ist Auswertungstag":(UI.wo||0)<0?`Woche endete am ${fmtDate(wk.bis)}`:`Auswertung am Sonntag, ${fmtDate(wk.bis)}`}</span></div>
    ${W?`<button class="btn sm pri" data-act="scan-pick"${sc.busy?" disabled":""}>${svg("image")}Screenshot auswerten</button>`:""}</div>
    ${sc.busy?`<div class="pad"><div class="note">${svg("clock")}Screenshot wird ausgelesen. Das dauert meist 10 bis 40 Sekunden.</div></div>`:""}
@@ -1883,6 +1893,7 @@ document.addEventListener("click",async e=>{
   if(a==="pw-reset"){if(UI.confirmDel!=="pw:"+id){UI.confirmDel="pw:"+id;render();return}UI.confirmDel=null;const k=konto(id);
     let pw="";if(await write(async()=>{pw=await HR.maStart(id,!!k?.leitung)},`Startpasswort vergeben für ${k?k.name:id}`))pwShow([[k?k.name:id,pw]]);return}
   if(a==="lpw-on"){if(UI.confirmDel!=="lpw"){UI.confirmDel="lpw";render();return}UI.confirmDel=null;pwAusChecked=true;if(await saveContent({leitungPwAus:false},"Gemeinsames Leitungs-Passwort wieder erlaubt"))toast("Das gemeinsame Leitungs-Passwort funktioniert wieder");return}
+  if(a==="bud-save"){const v=Math.max(0,Math.round(+String($("#hrBud")?.value||"").replace(/[^0-9]/g,"")));if(!v){toast("Bitte einen Betrag eingeben.");return}if(await saveContent({hrBudget:v},`HR-Budget auf ${money(v)} gesetzt`))toast("Budget gespeichert");return}
   if(a==="pw-all"){if(UI.confirmDel!=="pw:all"){UI.confirmDel="pw:all";render();return}UI.confirmDel=null;const out=[];toast("Erstelle Startpasswörter …");
     for(const k of sortedKonten()){let z=null;try{z=await HR.zugang(k.id)}catch{}if(z&&z.uid)continue;try{out.push([k.name,await HR.maStart(k.id,!!k.leitung)])}catch(er){out.push([k.name,"Fehler"])}}
     try{await db.collection("log").add({zeit:Date.now(),text:`Startpasswörter vergeben für ${out.length} Mitarbeiter`,by:uid||""})}catch{}
@@ -1894,7 +1905,7 @@ document.addEventListener("click",async e=>{
   if(a==="zeit-save"){const o={};for(const [d,,l] of ZTAGE){const v=$("#zv-"+d).value,b=$("#zb-"+d).value;if(!!v!==!!b){toast(`${l}: Start und Ende eintragen oder beides leer lassen.`);return}o[d]=v&&b?[v,b]:null}
     if(await saveContent({zeiten:o,zeitenHinweis:$("#zHint").value.trim()},"Arbeitszeiten geändert")){UI.edit.zeiten=false;render();toast("Arbeitszeiten gespeichert")}return}
   if(["row-add","row-del","draft-clear","draft-save","paid","pay-copy","tarife-save"].includes(a)){await payoutAction(a,id);return}
-  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset","pw-reset","pw-all","lpw-on"].includes(a))UI.confirmDel=null;
+  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset","pw-reset","pw-all","lpw-on","bud-save"].includes(a))UI.confirmDel=null;
   if(a==="rule-add"){c.richtlinien=[...collectRules(),{rolle:"Neue Rolle",punkte:[]}];render()}
   if(a==="rule-del"){const r=collectRules();r.splice(i,1);c.richtlinien=r;render()}
   if(a==="rule-save"){const r=collectRules();if(await saveContent({richtlinien:r},"HR Richtlinien aktualisiert")){UI.edit.richtlinien=false;render();toast("Richtlinien gespeichert")}}
