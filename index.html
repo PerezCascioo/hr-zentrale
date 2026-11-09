@@ -1371,10 +1371,10 @@ async function doSecret(ort){if(secBusy)return;const wk=weekOf(),kid=meId(),k=ko
   secBusy=true;try{const ref=db.doc("geschenke/"+secId(wk.id));const ex=await ref.get();
     if(ex.exists){const g=ex.data()||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(g.name||"Jemand")} war diese Woche schneller. Ab Montag versteckt sich ein neues Secret.</p>`);render();return}
     const vr=db.doc("versuche/"+k.id),vd=await vr.get(),v=vd.exists?vd.data()||{}:null,last=v?gMs(v.t):0;
-    if(last&&Date.now()-last<SEC_WAIT){secShow(`<h2>Noch warten</h2><p class="hint">${esc(k.name)} hatte gerade einen Versuch. Der nächste ist ab <b>${hhmm(last+SEC_WAIT)} Uhr</b> möglich.</p>`);return}
-    try{await vr.set({ort,wid:wk.id,t:"__NOW__"})}catch(e){secShow(`<h2>Noch warten</h2><p class="hint">Pro Person ist nur alle 30 Minuten ein Versuch möglich.</p>`);return}
+    if(last&&Date.now()-last<SEC_WAIT){secShow(`<h2>Du bist noch gesperrt</h2><p class="hint">Nach einem Fehlversuch gilt eine Sperre von 30 Minuten. Du kannst ab <b>${hhmm(last+SEC_WAIT)} Uhr</b> wieder suchen.</p>`);return}
+    try{await vr.set({ort,wid:wk.id,t:"__NOW__"})}catch(e){secShow(`<h2>Du bist noch gesperrt</h2><p class="hint">Nach einem Fehlversuch gilt eine Sperre von 30 Minuten. Versuch es später nochmal.</p>`);return}
     let cl;try{cl=await HR.claimOnce("geschenke/"+secId(wk.id),{kontoId:k.id,name:k.name,ort})}
-    catch(e){secShow(`<h2>Hier ist nichts</h2><p class="hint">Das war nicht das echte Secret, hier war nichts drin. Nächster Versuch für ${esc(k.name)} ab <b>${hhmm(Date.now()+SEC_WAIT)} Uhr</b>.</p>`);return}
+    catch(e){secShow(`<h2>Hier ist nichts</h2><p class="hint">Das war nicht das echte Secret. Du bist jetzt für <b>30 Minuten gesperrt</b> und kannst ab <b>${hhmm(Date.now()+SEC_WAIT)} Uhr</b> wieder suchen.</p>`);return}
     if(!cl.won){const o=cl.data||{};secShow(`<h2>Zu spät</h2><p class="hint">${esc(o.name||"Jemand")} war diese Woche schneller.</p>`);render();return}
     const sd=await ref.get();const g={id:secId(wk.id),...(sd.data()||{})};
     if(!S.geschenke.some(x=>x.id===g.id))S.geschenke=[g,...S.geschenke];const a=secAmt(g);
