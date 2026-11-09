@@ -6,10 +6,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function ownerDoc() { return /databases/$(database)/documents/meta/owner; }
-    // Leitung: der Haupt-Zugang (meta/owner) oder ein Leitungs-Mitglied mit eigenem Passwort (leitung/<uid>)
+    // Leitung: der Haupt-Zugang (meta/owner, nur solange das gemeinsame Leitungs-Passwort nicht abgeschaltet ist)
+    // oder ein Leitungs-Mitglied mit eigenem Passwort (leitung/<uid>)
     function isLeitung() {
       return request.auth != null && (
-        (exists(ownerDoc()) && get(ownerDoc()).data.uid == request.auth.uid)
+        (exists(ownerDoc()) && get(ownerDoc()).data.uid == request.auth.uid
+          && !get(/databases/$(database)/documents/hr/content).data.get('leitungPwAus', false))
         || exists(/databases/$(database)/documents/leitung/$(request.auth.uid)));
     }
     function wStart(wid) { return timestamp.date(int(wid.split('-')[1]), int(wid.split('-')[2]), int(wid.split('-')[3])); }
