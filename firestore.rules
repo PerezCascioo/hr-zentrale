@@ -6,8 +6,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function ownerDoc() { return /databases/$(database)/documents/meta/owner; }
+    // Leitung: der Haupt-Zugang (meta/owner) oder ein Leitungs-Mitglied mit eigenem Passwort (leitung/<uid>)
     function isLeitung() {
-      return request.auth != null && exists(ownerDoc()) && get(ownerDoc()).data.uid == request.auth.uid;
+      return request.auth != null && (
+        (exists(ownerDoc()) && get(ownerDoc()).data.uid == request.auth.uid)
+        || exists(/databases/$(database)/documents/leitung/$(request.auth.uid)));
     }
     function wStart(wid) { return timestamp.date(int(wid.split('-')[1]), int(wid.split('-')[2]), int(wid.split('-')[3])); }
     function nachweis(id) { return /databases/$(database)/documents/nachweise/$(id); }
@@ -18,23 +21,23 @@ service cloud.firestore {
       return isLeitung() || (request.auth != null && kid is string && exists(zugangDoc(kid)) && get(zugangDoc(kid)).data.uid == request.auth.uid);
     }
 
-    // Mitarbeiter-Passwörter: Jeder legt sein eigenes fest. Nach „Passwort zurücksetzen“ durch die Leitung
-    // (uid = null, neue Version) kann die Person ein neues festlegen.
+    // Mitarbeiter-Passwörter: Die Leitung vergibt Startpasswörter (legt das Konto an).
+    // Der Mitarbeiter darf nur vermerken, dass er sein Startpasswort geändert hat.
     match /zugang/{kid} {
       allow read: if true;
-      allow create: if isLeitung() || (request.auth != null
-        && exists(/databases/$(database)/documents/konten/$(kid))
-        && request.resource.data.keys().hasOnly(['uid','v','seit'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.v == 1
-        && request.auth.token.email == kid.lower() + '.1@ma.hr-zentral.app');
+      allow create, delete: if isLeitung();
       allow update: if isLeitung() || (request.auth != null
-        && resource.data.uid == null
-        && request.resource.data.keys().hasOnly(['uid','v','seit'])
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid','v','seit','start'])
+        && request.resource.data.uid == resource.data.uid
         && request.resource.data.v == resource.data.v
-        && request.resource.data.uid == request.auth.uid
-        && request.auth.token.email == kid.lower() + '.' + string(resource.data.v) + '@ma.hr-zentral.app');
-      allow delete: if isLeitung();
+        && request.resource.data.start == false);
+    }
+
+    // Leitungs-Mitglieder mit eigenem Passwort
+    match /leitung/{luid} {
+      allow read: if request.auth != null && (request.auth.uid == luid || isLeitung());
+      allow write: if isLeitung();
     }
 
     match /meta/owner {
@@ -171,7 +174,7 @@ service cloud.firestore {
 
     match /{coll}/{id} {
       allow read: if !(coll in ['config','log','feedback']);
-      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke','versuche','zugang']);
+      allow write: if isLeitung() && !(coll in ['meta','config','log','nachweise','bilder','pruefung','feedback','geschenke','versuche','zugang','leitung']);
     }
   }
 }
