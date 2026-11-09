@@ -858,6 +858,7 @@ HR.maStart=async(kid,isLead)=>{const z=await get("zugang/"+kid),v=((z&&z.v)||0)+
   if(z&&z.uid)await F.deleteDoc(F.doc(fs,"leitung/"+z.uid)).catch(()=>{});
   if(isLead)await F.setDoc(F.doc(fs,"leitung/"+cr.user.uid),{kid}).catch(perm);
   return pw};
+HR.setLeitung=async(kid,on)=>{const z=await get("zugang/"+kid);if(!z||!z.uid)return;if(on)await F.setDoc(F.doc(fs,"leitung/"+z.uid),{kid}).catch(perm);else await F.deleteDoc(F.doc(fs,"leitung/"+z.uid)).catch(perm)};
 HR.maChangePw=async(kid,oldPw,newPw)=>{const u=auth.currentUser;if(!u)throw{code:"auth/requires-recent-login"};
   if(oldPw)await A.reauthenticateWithCredential(u,A.EmailAuthProvider.credential(u.email,oldPw));
   await A.updatePassword(u,newPw);const z=await get("zugang/"+kid);if(z&&z.start)await F.setDoc(F.doc(fs,"zugang/"+kid),{uid:z.uid,v:z.v,seit:z.seit||Date.now(),start:false}).catch(()=>{})};
@@ -1011,6 +1012,12 @@ const maId=()=>HR.maLow?(S.konten.find(k=>String(k.id).toLowerCase()===HR.maLow)
 const meId=()=>HR.uid?getWho():maId();
 /* Wer darf in Formularen ausgewählt werden: Leitung alle, Mitarbeiter nur sich selbst */
 const myKonten=()=>HR.uid?sortedKonten():maId()?[konto(maId())]:[];
+/* Gemeinsames Leitungs-Passwort abschalten, sobald alle ihr eigenes Passwort gesetzt haben */
+let pwAusChecked=false;
+async function leitungPwCheck(){if(pwAusChecked||!HR.leitKid||!db||!S.konten.length||S.content?.leitungPwAus)return;pwAusChecked=true;
+  try{for(const k of S.konten){const z=await HR.zugang(k.id);if(!z||!z.uid||z.start)return}
+    await db.doc("hr/content").update({leitungPwAus:true});try{await db.collection("log").add({zeit:Date.now(),text:"Gemeinsames Leitungs-Passwort abgeschaltet (alle haben ein eigenes Passwort)",by:uid||""})}catch{}
+    toast("Alle haben jetzt ein eigenes Passwort. Das gemeinsame Leitungs-Passwort ist abgeschaltet.")}catch{}}
 let pwAsked=false;
 async function pwStartCheck(){const kid=HR.leitKid||maId();if(pwAsked||!kid||!HR.zugang)return;pwAsked=true;try{const z=await HR.zugang(kid);if(z&&z.start)openPwChange(true)}catch{}}
 function openPwChange(first){const b=$("#loginBody");b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${first?"Leg dein eigenes Passwort fest":"Passwort ändern"}</h2><p>${first?"Du hast dich mit dem Startpasswort der Leitung angemeldet. Wähle jetzt ein eigenes, das nur du kennst.":"Mindestens 6 Zeichen."}</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
@@ -1031,17 +1038,17 @@ function openMe(){const b=$("#loginBody");
 function meFoot(){const k=konto(UI.meSel),gast=`<button class="btn" data-me-gast style="flex:1">Ich bin Gast</button>`;
   if(!k)return`<div class="row" style="gap:8px;margin-top:6px">${gast}</div>`;
   if(UI.zg===null)return`<div class="hint" style="margin-top:8px">Einen Moment …</div>`;
-  if(k.leitung&&UI.zg===false)return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">${esc(k.name)} gehört zur Leitung und hat noch kein eigenes Passwort. Anmelden mit dem gemeinsamen Leitungs-Passwort.</span>
+  if(k.leitung&&UI.zg===false&&!S.content?.leitungPwAus)return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">${esc(k.name)} gehört zur Leitung und hat noch kein eigenes Passwort. Anmelden mit dem gemeinsamen Leitungs-Passwort.</span>
     <label class="f" for="meP">Passwort<input class="i" id="meP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
     <div class="row" style="gap:8px">${gast}<button class="btn pri" data-me-login style="flex:1">Anmelden</button></div></div>`;
   if(UI.zg===null)return`<div class="hint" style="margin-top:8px">Einen Moment …</div>`;
   if(UI.zg&&UI.zg.uid)return`<div class="stack" style="gap:8px;margin-top:8px">
     <label class="f" for="maP">Dein Passwort<input class="i" id="maP" type="password" autocomplete="current-password"></label><span class="status" id="lgMsg"></span>
-    <span class="hint">Passwort vergessen? Die Leitung kann es in der Mitarbeiterliste zurücksetzen.${k.leitung?` <button type="button" class="btn sm ghost" data-me-shared style="padding:2px 6px">Gemeinsames Leitungs-Passwort benutzen</button>`:""}</span>
+    <span class="hint">Passwort vergessen? Die Leitung kann es in der Mitarbeiterliste zurücksetzen.${k.leitung&&!S.content?.leitungPwAus?` <button type="button" class="btn sm ghost" data-me-shared style="padding:2px 6px">Gemeinsames Leitungs-Passwort benutzen</button>`:""}</span>
     <div class="row" style="gap:8px">${gast}<button class="btn pri" data-ma-login style="flex:1">Anmelden</button></div></div>`;
   return`<div class="stack" style="gap:8px;margin-top:8px"><span class="hint">Für ${esc(k.name)} gibt es noch kein Passwort. Die Leitung gibt dir ein Startpasswort, das du danach selbst änderst.</span>
     <div class="row" style="gap:8px">${gast}</div></div>`}
-function applyWho(){if(HR.maLow)setTimeout(pwStartCheck,600);const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}setTimeout(()=>syncPic(),800)}}
+function applyWho(){if(HR.maLow){setTimeout(pwStartCheck,600);setTimeout(leitungPwCheck,2500)}const n=whoName();if(HR.uid&&n){UI.me=n;const el=$("#meName");if(el)el.textContent=n;try{applyP()}catch{}setTimeout(()=>syncPic(),800)}}
 function openWho(){const b=$("#loginBody");UI.whoSel=getWho();
   b.innerHTML=`<header><div><div class="eyebrow">Leitung</div><h2 id="loginT">Wer bist du?</h2><p>Damit im Änderungsprotokoll steht, wer was gemacht hat.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
    <div id="whoBox">${whoPicker(UI.whoSel)}</div><span class="status" id="lgMsg"></span><button class="btn pri block" data-who-save>Übernehmen</button>`;
@@ -1066,7 +1073,8 @@ const editBtn=k=>writable()?`<button class="btn${UI.edit[k]?" pri":""}" data-edi
 
 /* Mehrere Änderungen kurz hintereinander nur einmal zeichnen */
 let _rt=0;function renderSoon(){if(_rt)return;_rt=setTimeout(()=>{_rt=0;render()},80)}
-function render(){render2();try{secPlace()}catch{}}
+function render(){render2();try{secPlace()}catch{}
+  if(HR.owner&&S.content?.leitungPwAus&&!UI.kicked){UI.kicked=1;toast("Das gemeinsame Leitungs-Passwort ist abgeschaltet. Melde dich mit deinem eigenen Passwort an.");setTimeout(()=>HR.logout(),2500)}}
 function render2(){
   renderNav();if(typeof renderAuth==="function")renderAuth();
   const v=$("#view");
@@ -1741,7 +1749,7 @@ function vKonten(){
   const f=groups.some(x=>x.g===UI.lv)?UI.lv:"all";
   const shown=groups.filter(x=>f==="all"||x.g===f).map(x=>({...x,list:x.list.filter(k=>!q||k.name.toLowerCase().includes(q))})).filter(x=>x.list.length);
   const nLead=all.filter(k=>k.leitung).length,cols=W?4:1;
-  const addBtn=(W?`<button class="btn" data-act="pw-all">${svg("check")}${UI.confirmDel==="pw:all"?"Wirklich? Für alle ohne Passwort":"Startpasswörter für alle"}</button>`:"")+(W?`<button class="btn${UI.addOpen?"":" pri"}" data-act="add-toggle">${svg(UI.addOpen?"check":"userplus")}${UI.addOpen?"Schließen":"Mitarbeiter hinzufügen"}</button>`:"");
+  const addBtn=(W&&S.content?.leitungPwAus?`<button class="btn ghost" data-act="lpw-on">${UI.confirmDel==="lpw"?"Wirklich wieder erlauben?":"Leitungs-Passwort wieder erlauben"}</button>`:"")+(W?`<button class="btn" data-act="pw-all">${svg("check")}${UI.confirmDel==="pw:all"?"Wirklich? Für alle ohne Passwort":"Startpasswörter für alle"}</button>`:"")+(W?`<button class="btn${UI.addOpen?"":" pri"}" data-act="add-toggle">${svg(UI.addOpen?"check":"userplus")}${UI.addOpen?"Schließen":"Mitarbeiter hinzufügen"}</button>`:"");
   const form=W&&UI.addOpen?`<div class="card pad" style="margin-bottom:14px"><div class="row">
     <label class="f" for="nN">Name<input class="i" id="nN" placeholder="z. B. Alex Meyer" autocomplete="off"></label>
     <label class="f" for="nF">Position<input class="i" id="nF" placeholder="z. B. Human Resources Trainee" list="posList" autocomplete="off"></label>
@@ -1844,6 +1852,7 @@ document.addEventListener("click",async e=>{
     if(await write(()=>db.doc("feedback/"+id).delete(),`Feedback von ${x&&x.name||"Anonym"} gelöscht`))toast("Feedback gelöscht");return}
   if(a==="pw-reset"){if(UI.confirmDel!=="pw:"+id){UI.confirmDel="pw:"+id;render();return}UI.confirmDel=null;const k=konto(id);
     let pw="";if(await write(async()=>{pw=await HR.maStart(id,!!k?.leitung)},`Startpasswort vergeben für ${k?k.name:id}`))pwShow([[k?k.name:id,pw]]);return}
+  if(a==="lpw-on"){if(UI.confirmDel!=="lpw"){UI.confirmDel="lpw";render();return}UI.confirmDel=null;pwAusChecked=true;if(await saveContent({leitungPwAus:false},"Gemeinsames Leitungs-Passwort wieder erlaubt"))toast("Das gemeinsame Leitungs-Passwort funktioniert wieder");return}
   if(a==="pw-all"){if(UI.confirmDel!=="pw:all"){UI.confirmDel="pw:all";render();return}UI.confirmDel=null;const out=[];toast("Erstelle Startpasswörter …");
     for(const k of sortedKonten()){let z=null;try{z=await HR.zugang(k.id)}catch{}if(z&&z.uid)continue;try{out.push([k.name,await HR.maStart(k.id,!!k.leitung)])}catch(er){out.push([k.name,"Fehler"])}}
     try{await db.collection("log").add({zeit:Date.now(),text:`Startpasswörter vergeben für ${out.length} Mitarbeiter`,by:uid||""})}catch{}
@@ -1855,7 +1864,7 @@ document.addEventListener("click",async e=>{
   if(a==="zeit-save"){const o={};for(const [d,,l] of ZTAGE){const v=$("#zv-"+d).value,b=$("#zb-"+d).value;if(!!v!==!!b){toast(`${l}: Start und Ende eintragen oder beides leer lassen.`);return}o[d]=v&&b?[v,b]:null}
     if(await saveContent({zeiten:o,zeitenHinweis:$("#zHint").value.trim()},"Arbeitszeiten geändert")){UI.edit.zeiten=false;render();toast("Arbeitszeiten gespeichert")}return}
   if(["row-add","row-del","draft-clear","draft-save","paid","pay-copy","tarife-save"].includes(a)){await payoutAction(a,id);return}
-  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset","pw-reset","pw-all"].includes(a))UI.confirmDel=null;
+  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset","pw-reset","pw-all","lpw-on"].includes(a))UI.confirmDel=null;
   if(a==="rule-add"){c.richtlinien=[...collectRules(),{rolle:"Neue Rolle",punkte:[]}];render()}
   if(a==="rule-del"){const r=collectRules();r.splice(i,1);c.richtlinien=r;render()}
   if(a==="rule-save"){const r=collectRules();if(await saveContent({richtlinien:r},"HR Richtlinien aktualisiert")){UI.edit.richtlinien=false;render();toast("Richtlinien gespeichert")}}
@@ -1885,8 +1894,10 @@ document.addEventListener("click",async e=>{
     if(await write(()=>db.doc("plaetze/"+id).delete(),`Platz „${p?.funktion}“ in ${p?.abteilung} gelöscht`))toast("Platz gelöscht")}
   if(a==="acc-add"){const n=$("#nN").value.trim(),s=1,p=$("#nP").value.trim(),pos=$("#nF").value.trim(),ld=$("#nL").checked,ord=Math.max(0,...S.konten.map(k=>k.ord||0))+1;if(!n){toast("Bitte einen Namen eingeben.");return}
     if(S.konten.some(k=>k.name.toLowerCase()===n.toLowerCase())){toast("Diesen Benutzernamen gibt es schon.");return}
-    if(await write(()=>db.collection("konten").add({name:n,stufe:s,pass:p,position:pos,leitung:ld,ord,angelegt:Date.now()}),`Mitarbeiter ${n} hinzugefügt`)){toast(`${n} hinzugefügt`);$("#nN").value="";$("#nP").value="";$("#nF").value="";$("#nL").checked=false}}
+    let ref=null;if(await write(async()=>{ref=await db.collection("konten").add({name:n,stufe:s,pass:p,position:pos,leitung:ld,ord,angelegt:Date.now()})},`Mitarbeiter ${n} hinzugefügt`)){$("#nN").value="";$("#nP").value="";$("#nF").value="";$("#nL").checked=false;
+      let pw="";try{if(ref&&ref.id)pw=await HR.maStart(ref.id,ld)}catch{}if(pw)pwShow([[n,pw]]);else toast(`${n} hinzugefügt. Startpasswort bitte einzeln über „Startpasswort“ erstellen.`)}}
   if(a==="acc-ren"){UI.rename=id||null;render();return}
+  if(a==="acc-ren-save"){const k0=konto(id),ld0=!!k0?.leitung,ld1=!!$("#rl-"+id)?.checked;if(k0&&ld0!==ld1)setTimeout(()=>HR.setLeitung&&HR.setLeitung(id,ld1).catch(()=>{}),300)}
   if(a==="acc-ren-save"){const k=konto(id),n=($("#rn-"+id)?.value||"").trim(),pos=($("#rf-"+id)?.value||"").trim(),ld=!!$("#rl-"+id)?.checked;if(!k||!n)return;if(S.konten.some(x=>x.id!==id&&x.name.toLowerCase()===n.toLowerCase())){toast("Diesen Namen gibt es schon.");return}
     if(await write(()=>db.doc("konten/"+id).update({name:n,position:pos,leitung:ld,pass:($("#rp-"+id)?.value??String(k.pass||"")).trim().slice(0,20)}),`Mitarbeiter ${n} bearbeitet (${pos||"keine Position"}${ld?", Leitung":""})`))toast("Gespeichert");UI.rename=null;render();return}
   if(a==="add-toggle"){UI.addOpen=!UI.addOpen;render();return}
