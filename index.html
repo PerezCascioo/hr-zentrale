@@ -1325,8 +1325,10 @@ function vVergleich(wk){const pw=weekOf(new Date(wk.von-3*864e5)),a=weekStats(wk
      <div class="hint" style="font-size:11.5px">${l}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:4px;flex-wrap:wrap"><b class="num" style="font-size:19px">${v(x,cur)}</b>${deltaPill(x,y)}</div>
      <div class="hint" style="font-size:11px;margin-top:2px">Vorwoche: ${v(y,cur)}</div></div>`).join("")}</div>
    <div class="hint" style="font-size:11px;margin-top:10px">Ohne Geschenk, Boost und Abzeichen-Bonus gerechnet.</div></div></div>`}
-function vGiftAdmin(wk){if(!UI.admin)return"";const g=giftOf(wk.id);if(!g)return"";const a=giftAmt(g);
-  return`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">Geschenk der Woche: <b>${esc(g.name)}</b> hat ${a?money(a):"…"} gewonnen.</span><button class="btn sm danger" data-act="gift-reset" data-id="${wk.id}">${UI.confirmDel==="gift:"+wk.id?"Wirklich zurücksetzen?":"Geschenk zurücksetzen"}</button></div>`}
+function vGiftAdmin(wk){if(!UI.admin)return"";const g=giftOf(wk.id),sf=secOf(wk.id);
+  const sec=sf?`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">Secret der Woche: <b>${esc(sf.name)}</b> hat ${secAmt(sf)?money(secAmt(sf)):"…"} gefunden.</span><button class="btn sm danger" data-act="sec-reset" data-id="${wk.id}">${UI.confirmDel==="sec:"+wk.id?"Wirklich neu verstecken?":"Secret neu verstecken"}</button></div>`:"";
+  if(!g)return sec;const a=giftAmt(g);
+  return sec+`<div class="note" style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${svg("star")}<span style="flex:1">Geschenk der Woche: <b>${esc(g.name)}</b> hat ${a?money(a):"…"} gewonnen.</span><button class="btn sm danger" data-act="gift-reset" data-id="${wk.id}">${UI.confirmDel==="gift:"+wk.id?"Wirklich zurücksetzen?":"Geschenk zurücksetzen"}</button></div>`}
 function vAuszahlungen(){
   const c=S.content||{},wk=selWeek(),w=weekDoc(wk.id),ed=UI.edit.tarife,t=ed?{...TDEF,...(c.tarife||{})}:tarife(w);
   if(UI.per&&UI.per!=="woche")return page("auszahlungen","Auszahlungen",UI.per==="3m"?"Alle Auszahlungen der letzten 3 Monate.":"Alle Auszahlungen seit Beginn.")+periodBar(wk)+vAggregate();
@@ -1765,12 +1767,17 @@ document.addEventListener("click",async e=>{
     await write(()=>db.doc("feedback/"+id).update(a==="fb-done"?{status:"erledigt",erledigtVon:whoName()||"Leitung",erledigtZeit:Date.now()}:{status:"neu"}),null);return}
   if(a==="fb-del"){if(UI.confirmDel!==id){UI.confirmDel=id;render();return}UI.confirmDel=null;const x=(S.feedback||[]).find(y=>y.id===id);
     if(await write(()=>db.doc("feedback/"+id).delete(),`Feedback von ${x&&x.name||"Anonym"} gelöscht`))toast("Feedback gelöscht");return}
+  if(a==="sec-reset"){if(UI.confirmDel!=="sec:"+id){UI.confirmDel="sec:"+id;render();return}UI.confirmDel=null;const sf=secOf(id);
+    const wkx=weekOf(),oldSp=secSpotOf(wkx),oldSalt=S.content?.secretSalt;let salt="";
+    for(let i=0;i<50;i++){salt=Math.random().toString(36).slice(2,10);if(S.content)S.content.secretSalt=salt;if(secSpotOf(wkx)!==oldSp)break}
+    if(S.content)S.content.secretSalt=oldSalt;
+    if(await write(async()=>{await db.doc("geschenke/"+secId(id)).delete();await db.doc("hr/content").update({secretSalt:salt})},`Secret der Woche neu versteckt${sf?` (war gefunden von ${sf.name}, ${money(secAmt(sf))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==secId(id));if(S.content)S.content.secretSalt=salt;render();toast("Secret ist an einem neuen Ort versteckt und kann wieder gefunden werden")}return}
   if(a==="gift-reset"){if(UI.confirmDel!=="gift:"+id){UI.confirmDel="gift:"+id;render();return}UI.confirmDel=null;const g=giftOf(id);
     if(await write(()=>db.doc("geschenke/"+id).delete(),`Geschenk der Woche zurückgesetzt${g?` (war ${g.name}, ${money(giftAmt(g))})`:""}`)){S.geschenke=(S.geschenke||[]).filter(x=>x.id!==id);giftReady();render();toast("Geschenk zurückgesetzt, es kann neu geöffnet werden")}return}
   if(a==="zeit-save"){const o={};for(const [d,,l] of ZTAGE){const v=$("#zv-"+d).value,b=$("#zb-"+d).value;if(!!v!==!!b){toast(`${l}: Start und Ende eintragen oder beides leer lassen.`);return}o[d]=v&&b?[v,b]:null}
     if(await saveContent({zeiten:o,zeitenHinweis:$("#zHint").value.trim()},"Arbeitszeiten geändert")){UI.edit.zeiten=false;render();toast("Arbeitszeiten gespeichert")}return}
   if(["row-add","row-del","draft-clear","draft-save","paid","pay-copy","tarife-save"].includes(a)){await payoutAction(a,id);return}
-  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset"].includes(a))UI.confirmDel=null;
+  if(!["acc-del","slot-del","li-del","li-arch","li-kill","li-ask","li-arch2","login-del","fb-del","gift-reset","sec-reset"].includes(a))UI.confirmDel=null;
   if(a==="rule-add"){c.richtlinien=[...collectRules(),{rolle:"Neue Rolle",punkte:[]}];render()}
   if(a==="rule-del"){const r=collectRules();r.splice(i,1);c.richtlinien=r;render()}
   if(a==="rule-save"){const r=collectRules();if(await saveContent({richtlinien:r},"HR Richtlinien aktualisiert")){UI.edit.richtlinien=false;render();toast("Richtlinien gespeichert")}}
