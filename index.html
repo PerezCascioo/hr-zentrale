@@ -1026,7 +1026,10 @@ function openPwChange(first){const b=$("#loginBody");b.innerHTML=`<header><div><
   <label class="f" for="pwN2">Neues Passwort wiederholen<input class="i" id="pwN2" type="password" autocomplete="new-password"></label><span class="status" id="lgMsg"></span>
   <div class="row" style="gap:8px"><button class="btn" data-close-login style="flex:1">${first?"Später":"Abbrechen"}</button><button class="btn pri" data-pw-save style="flex:1">Speichern</button></div></div>`;
   const d=$("#loginDlg");if(!d.open)d.showModal();setTimeout(()=>($("#pwOld")||$("#pwN1"))?.focus(),50)}
-function applyMe(){if(HR.maLow)setTimeout(pwStartCheck,600);if(HR.uid)return;let k=maId()?konto(maId()):null;const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
+/* Umstellung auf Passwörter: alte Namensauswahl ohne Passwort verwerfen und zur Anmeldung auffordern */
+let oldMeDone=false;
+function oldMeCheck(){if(oldMeDone||HR.uid||HR.maLow||!S.konten.length)return;oldMeDone=true;const m=getMe();if(m&&m!=="gast"&&konto(m)){setMe("");setTimeout(()=>{try{openMe();toast("HR Zentral hat jetzt Passwörter. Bitte melde dich neu an.")}catch{}},400)}}
+function applyMe(){if(HR.maLow)setTimeout(pwStartCheck,600);try{oldMeCheck()}catch{}if(HR.uid)return;let k=maId()?konto(maId()):null;const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
 function openMe(){const b=$("#loginBody");
   if(HR.maLow){const k=konto(HR.leitKid||maId());b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${esc(k?k.name:"Angemeldet")}</h2><p>Du bist mit deinem eigenen Passwort angemeldet.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
     <div class="row" style="gap:8px"><button class="btn" data-close-login style="flex:1">Schließen</button><button class="btn danger" data-ma-logout style="flex:1">Abmelden</button></div>`;$("#loginDlg").showModal();return}
