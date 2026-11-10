@@ -861,7 +861,7 @@ HR.maStart=async(kid,isLead)=>{const z=await get("zugang/"+kid),v=((z&&z.v)||0)+
 HR.setLeitung=async(kid,on)=>{const z=await get("zugang/"+kid);if(!z||!z.uid)return;if(on)await F.setDoc(F.doc(fs,"leitung/"+z.uid),{kid}).catch(perm);else await F.deleteDoc(F.doc(fs,"leitung/"+z.uid)).catch(perm)};
 HR.maChangePw=async(kid,oldPw,newPw)=>{const u=auth.currentUser;if(!u)throw{code:"auth/requires-recent-login"};
   if(oldPw)await A.reauthenticateWithCredential(u,A.EmailAuthProvider.credential(u.email,oldPw));
-  await A.updatePassword(u,newPw);const z=await get("zugang/"+kid);if(z&&z.start)await F.setDoc(F.doc(fs,"zugang/"+kid),{uid:z.uid,v:z.v,seit:z.seit||Date.now(),start:false}).catch(()=>{})};
+  await A.updatePassword(u,newPw);const z=await get("zugang/"+kid);if(z&&z.start)await F.setDoc(F.doc(fs,"zugang/"+kid),{uid:z.uid,v:z.v,seit:z.seit||Date.now(),start:false}).catch(perm)};
 HR.createLogin=async(kontoId,email,pw)=>{const second=initializeApp(cfg,"zweit"+Date.now()),a2=A.getAuth(second);
   const cr=await A.createUserWithEmailAndPassword(a2,email,pw);await A.signOut(a2);
   await F.setDoc(F.doc(fs,"admins/"+cr.user.uid),{kontoId,email,angelegt:Date.now()}).catch(perm)};
@@ -1021,7 +1021,7 @@ async function leitungPwCheck(){if(pwAusChecked||!HR.leitKid||!db||!S.konten.len
 let pwAsked=false;
 async function pwStartCheck(){const kid=HR.leitKid||maId();if(pwAsked||!kid||!HR.zugang)return;pwAsked=true;try{const z=await HR.zugang(kid);if(z&&z.start)openPwChange(true)}catch{}}
 function openPwChange(first){const b=$("#loginBody");b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${first?"Leg dein eigenes Passwort fest":"Passwort ändern"}</h2><p>${first?"Du hast dich mit dem Startpasswort der Leitung angemeldet. Bevor du weitermachen kannst, wähle ein eigenes Passwort, das nur du kennst (mindestens 6 Zeichen).":"Mindestens 6 Zeichen."}</p></div>${first?"":`<button class="ibtn" data-close-login aria-label="Schließen">×</button>`}</header>
-  <div class="stack" style="gap:8px">${first?"":`<label class="f" for="pwOld">Aktuelles Passwort<input class="i" id="pwOld" type="password" autocomplete="current-password"></label>`}
+  <div class="stack" style="gap:8px"><label class="f" for="pwOld">${first?"Startpasswort (das du von der Leitung bekommen hast)":"Aktuelles Passwort"}<input class="i" id="pwOld" type="password" autocomplete="current-password"></label>
   <label class="f" for="pwN1">Neues Passwort<input class="i" id="pwN1" type="password" autocomplete="new-password"></label>
   <label class="f" for="pwN2">Neues Passwort wiederholen<input class="i" id="pwN2" type="password" autocomplete="new-password"></label><span class="status" id="lgMsg"></span>
   <div class="row" style="gap:8px">${first?`<button class="btn" data-ma-logout style="flex:1">Abmelden</button>`:`<button class="btn" data-close-login style="flex:1">Abbrechen</button>`}<button class="btn pri" data-pw-save style="flex:1">Speichern</button></div></div>`;
@@ -1652,7 +1652,8 @@ Antworte nur mit JSON: {"anzeige":true,"sender":"Vorname Nachname","datum":"TT.M
 }
 
 
-async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}UI.li={busy:true,msg:"Screenshot wird gelesen …"};render();
+async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;if(liClosed()){UI.li={err:LI_CLOSED_MSG};render();return}
+  if(!HR.owner&&HR.zugang){try{const z=await HR.zugang(k.id);if(z&&z.start){UI.li={err:"Du hast noch das Startpasswort der Leitung. Leg zuerst dein eigenes Passwort fest, danach kannst du Screenshots einreichen."};render();openPwChange(true);return}}catch{}}UI.li={busy:true,msg:"Screenshot wird gelesen …"};render();
   UI.liOcr=null;if(!force){try{const r=await HR.ocrLI(file,(S.content?.werbung||"").trim(),S.konten.map(x=>x.name),k.name);
       UI.liOcr=r;const why=!r.anzeige?"Unsere Anzeige wurde oben links nicht erkannt.":r.senders&&r.senders.length&&!r.senders.includes(k.name)?`Unter eurer Anzeige steht ${r.senders.map(x=>"„"+x+"“").join(" und ")}, nicht ${k.name}. Jeder reicht nur seine eigene Anzeige ein.`:"";
       if(why){UI.liFile=file;UI.li={err:why+" Prüfe den Screenshot. Wenn er stimmt, kannst du ihn trotzdem einreichen, die Leitung schaut ihn sich dann an.",force:true};render();return}}catch{}}
@@ -1677,7 +1678,7 @@ async function submitPublic(file,force){const k=konto(UI.liKid);if(!k)return;if(
     await db.doc("nachweise/"+nid).set(doc);const ref={id:nid};let auto=false;
     if(ev&&ev.ki.ok&&ref&&ref.id&&!slotBusy(doc.slot,ref.id)){try{await db.doc("pruefung/"+ref.id).set(autoOk());auto=true}catch{}}
     UI.li={ok:auto?`Automatisch angenommen für ${k.name} (${doc.datum}, ${doc.uhrzeit} Uhr). Der Screenshot zählt schon zur Auszahlung.`:`Eingereicht für ${k.name}. ${ev&&ev.ki.grund?`Automatik: ${ev.ki.grund} `:""}Die Leitung prüft deinen Screenshot, danach zählt er zur Auszahlung.`}}
-  catch(e){UI.li={err:e&&e.code==="big"?"Das Bild ist zu groß. Bitte unter 15 MB.":"Hochladen fehlgeschlagen. Bitte nochmal versuchen."}}render()}
+  catch(e){console.warn("LI-Upload",e);UI.li={err:e&&e.code==="big"?"Das Bild ist zu groß. Bitte unter 15 MB.":e&&(e.code==="invalid_argument"||e.code==="permission-denied")?"Firebase hat das Speichern abgelehnt. Prüf, ob du mit deinem eigenen Namen angemeldet bist und dein Startpasswort schon geändert hast. Lade danach die Seite neu (Strg + F5).":"Hochladen fehlgeschlagen. Bitte nochmal versuchen."}}render()}
 document.addEventListener("change",e=>{if(e.target.id==="liPubIn"&&e.target.files[0])submitPublic(e.target.files[0])});
 addEventListener("change",e=>{if(e.target.id==="bgFile"&&e.target.files[0])setBgImg(e.target.files[0])});
 function kiEval(r,n){const p=x=>String(x).padStart(2,"0");let ki;
