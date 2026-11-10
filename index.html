@@ -1311,7 +1311,8 @@ const SEC_TABS=["ueberblick","richtlinien","kleidung","auszahlungen","werbung","
 /* 28 mögliche Orte: Titel und Text jedes Bereichs, jeder Menüpunkt, Logo, Fusszeile, Einstellungen, 4 Stellen im Sternenhimmel */
 const SEC_SPOTS=[...SEC_TABS.flatMap(t=>[t+"-titel",t+"-text","nav-"+t]),"logo","foot","set","sky-1","sky-2","sky-3","sky-4"];
 /* 10 verschiedene Objekte an zufälligen Orten, nur eins hat das Geld. Jedes ist pro Stunde nur 12 Minuten sichtbar. */
-const SEC_SHOW=12,SEC_N=100;
+/* Alle Objekte erscheinen nur in einem 15-Minuten-Fenster pro Stunde (pro Woche zufällig), jedes davon nur 4 Minuten */
+const SEC_SHOW=4,SEC_WIN=15,SEC_N=100,SEC_V=2;
 const SEC_DYN=["h2","h3","li","th","label","b",".hint",".pill"];
 const SEC_ICONS={
  schluessel:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
@@ -1356,16 +1357,16 @@ setInterval(()=>{try{secPlace()}catch{}},20000);
 /* Leitung: jeden Montag (und bei „Neu verstecken“) alles neu auslosen: Objekte, Orte, Zeiten und welches echt ist */
 let secEnsured="";
 function secRoll(wid){const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-  const typs=Object.keys(SEC_ICONS),rnd=n=>Math.floor(Math.random()*n),mk=ort=>({id:"o"+Math.random().toString(36).slice(2,9),typ:typs[rnd(typs.length)],ort,off:rnd(60),x:6+rnd(86),y:10+rnd(78)});
+  const typs=Object.keys(SEC_ICONS),rnd=n=>Math.floor(Math.random()*n),W=rnd(60),mk=ort=>({id:"o"+Math.random().toString(36).slice(2,9),typ:typs[rnd(typs.length)],ort,off:(60-((W+rnd(SEC_WIN-SEC_SHOW+1))%60))%60,x:6+rnd(86),y:10+rnd(78)});
   /* Das echte liegt an einem Ort, den alle sehen können; die anderen 99 überall verteilt */
   const real=mk(SEC_SPOTS[rnd(SEC_SPOTS.length)]);if(real.ort.startsWith("sky"))real.ort="sky";
   const items=[real];while(items.length<SEC_N){const r=Math.random();let ort;
-    if(r<.3)ort="sky";else if(r<.6){ort=SEC_SPOTS[rnd(SEC_SPOTS.length)];if(ort.startsWith("sky"))ort="sky"}
+    if(r<.1)ort="sky";else if(r<.5){ort=SEC_SPOTS[rnd(SEC_SPOTS.length)];if(ort.startsWith("sky"))ort="sky"}
     else ort=`dyn|${SEC_TABS[rnd(SEC_TABS.length)]}|${SEC_DYN[rnd(SEC_DYN.length)]}|${rnd(12)}`;items.push(mk(ort))}
-  return{pub:{wid,items:shuf(items)},cfg:{wid,ort:real.id,off:real.off}}}
+  return{pub:{wid,v:SEC_V,items:shuf(items)},cfg:{wid,ort:real.id,off:real.off}}}
 async function secEnsure(force){const wk=weekOf();if(wk.von<NEU_AB||!db||(!force&&secEnsured===wk.id))return;secEnsured=wk.id;
   try{const pd=await db.doc("hr/secret").get(),pub=pd.exists?pd.data()||{}:{};const cd=await db.doc("config/secret").get(),cfg=cd.exists?cd.data()||{}:{};
-    if(!force&&pub.wid===wk.id&&cfg.wid===wk.id&&Array.isArray(pub.items)&&pub.items.some(x=>x.id===cfg.ort))return;
+    if(!force&&pub.wid===wk.id&&pub.v===SEC_V&&cfg.wid===wk.id&&Array.isArray(pub.items)&&pub.items.some(x=>x.id===cfg.ort))return;
     const r=secRoll(wk.id);await db.doc("config/secret").set(r.cfg);await db.doc("hr/secret").set(r.pub);S.secPub=r.pub}catch{secEnsured=""}}
 function pwShow(list){const txt=list.map(([n,p])=>`${n}: ${p}`).join("\n");const b=$("#giftBody");
   b.innerHTML=`<header><div><div class="eyebrow">Startpasswörter</div><h2>Jetzt verschicken</h2><p class="hint">Schick jedem sein Passwort privat. Beim ersten Anmelden wird man aufgefordert, ein eigenes festzulegen. Diese Liste wird nicht gespeichert.</p></div><button class="ibtn" data-gift-close aria-label="Schließen">×</button></header>
