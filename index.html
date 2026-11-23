@@ -982,14 +982,9 @@ const EQUIP=["Kopfbedeckung","Oberteil","Accessoires","Weiteres Zubehör","Hosen
 const MEDAL=["#f2c94c","#cfd6e0","#d08b52"];
 
 let db=null,user=null,assets=null,uid=null,canWrite=true,live=false;
-const S={content:null,plaetze:[],wochen:[],log:[],pruefung:{},feedback:[],geschenke:[],_konten:[],_nachweise:[]};window.S=S;
-/* Ausgeblendete Mitarbeiter (konten.versteckt): sieht nur die Person selbst, wenn sie angemeldet ist.
-   Zum Anmelden auf einem neuen Gerät die Seite mit #versteckt am Ende der Adresse öffnen. */
-const SHOW_HIDDEN=/versteckt/i.test(location.hash||"");
-function rawMe(){try{if(typeof HR!=="undefined"&&HR.uid)return localStorage.getItem("hrz-who")||"";if(typeof HR!=="undefined"&&HR.maLow)return (S._konten.find(k=>String(k.id).toLowerCase()===HR.maLow)||{}).id||""}catch{}return""}
-function hiddenIds(){const me=rawMe(),h=new Set();for(const k of S._konten)if(k.versteckt&&k.id!==me&&!SHOW_HIDDEN)h.add(k.id);return h}
-Object.defineProperty(S,"konten",{get(){const h=hiddenIds();return h.size?S._konten.filter(k=>!h.has(k.id)):S._konten},set(v){S._konten=v||[]},enumerable:true});
-Object.defineProperty(S,"nachweise",{get(){const h=hiddenIds();return h.size?S._nachweise.filter(n=>!h.has(n.kontoId)):S._nachweise},set(v){S._nachweise=v||[]},enumerable:true});
+const S={content:null,konten:[],plaetze:[],wochen:[],log:[],nachweise:[],pruefung:{},feedback:[],geschenke:[]};window.S=S;
+/* Ausgeblendete Mitarbeiter (konten.versteckt) fehlen nur in der Mitarbeiterliste der anderen. Die Person selbst sieht sich dort weiter. */
+const listHidden=k=>!!k.versteckt&&k.id!==meId();
 const UI={tab:"ueberblick",edit:{},openSlot:null,showPass:{},confirmDel:null,q:"",lv:"all",st:"farben"};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1076,7 +1071,7 @@ const saveContent=(p,l)=>write(()=>db.doc("hr/content").update(p),l);
 /* ---------- Navigation ---------- */
 function renderNav(){
   const TABS=window.TABS_ALL.filter(t=>t[3]!=="Verwaltung"||UI.admin);
-  const cnt={konten:S.konten.length,protokoll:0,nachweise:(S.nachweise||[]).filter(n=>statusOf(n)==="offen").length,fbeingang:(S.feedback||[]).filter(x=>x.status!=="erledigt").length};let html="",grp="";
+  const cnt={konten:S.konten.filter(k=>!listHidden(k)).length,protokoll:0,nachweise:(S.nachweise||[]).filter(n=>statusOf(n)==="offen").length,fbeingang:(S.feedback||[]).filter(x=>x.status!=="erledigt").length};let html="",grp="";
   TABS.forEach(([id,l,ic,g])=>{if(g!==grp){if(grp)html+="</div>";html+=`<div class="navgrp"><span>${g}</span>`;grp=g}
     html+=`<button class="nav" data-tab="${id}" ${UI.tab===id?'aria-current="page"':""}>${svg(ic)}${esc(l)}${cnt[id]?`<span class="cnt num">${cnt[id]}</span>`:""}</button>`});
   $("#nav").innerHTML=html+"</div>";
@@ -1791,7 +1786,7 @@ const rankNorm=p=>String(p||"").toLowerCase().replace(/human\s+res+ources?/g,"hr
 const rankIdx=p=>{const n=rankNorm(p);return n?RANKS.findIndex(r=>rankNorm(r)===n):-1};
 const RANK_C=["var(--l3)","var(--l3)","var(--l3)","var(--l2)","var(--l1)","#7aa7ff","var(--l0)"];
 function vKonten(){
-  const q=UI.q.toLowerCase().trim(),all=sortedKonten(),W=writable();
+  const q=UI.q.toLowerCase().trim(),all=sortedKonten().filter(k=>!listHidden(k)),W=writable();
   const gk=k=>{const i=rankIdx(k.position);return i>=0?String(i):(k.position?"x:"+k.position:"none")};
   const keys=[...RANKS.map((_,i)=>String(i)),...[...new Set(all.map(k=>k.position).filter(p=>p&&rankIdx(p)<0))].map(p=>"x:"+p),"none"];
   const label=g=>g==="none"?"Ohne Position":g.startsWith("x:")?g.slice(2):RANKS[+g];
@@ -1812,8 +1807,8 @@ function vKonten(){
   const dl=W?`<datalist id="posList">${[...new Set([...RANKS,...S.konten.map(k=>k.position).filter(Boolean)])].map(p=>`<option value="${esc(p)}">`).join("")}</datalist>`:"";
   const row=(k,list,j)=>{const p=String(k.pass||""),sh=UI.showPass[k.id],ren=UI.rename===k.id,up=list[j-1],dn=list[j+1];return`<tr>
    ${W?`<td style="width:64px"><span class="tact" style="gap:2px"><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${up?up.id:""}" aria-label="Nach oben"${up?"":" disabled"}>▲</button><button class="btn sm ghost" data-act="mv" data-id="${k.id}" data-to="${dn?dn.id:""}" aria-label="Nach unten"${dn?"":" disabled"}>▼</button></span></td>`:""}
-   <td>${ren?`<div class="tact" style="flex-wrap:wrap"><input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:240px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label><label style="display:flex;gap:6px;align-items:center;font-size:12px" title="Nur diese Person selbst sieht sich noch im Dashboard"><input type="checkbox" id="rv-${k.id}"${k.versteckt?" checked":""}> Für andere ausblenden</label></div>`:
-    `<span class="who">${avOf(k)}<span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}${k.versteckt?' <span class="badge" style="margin-left:4px" title="Nur du siehst dich">Ausgeblendet</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
+   <td>${ren?`<div class="tact" style="flex-wrap:wrap"><input class="i" id="rn-${k.id}" value="${esc(k.name)}" style="width:170px;padding:6px 10px" aria-label="Name"><input class="i" id="rf-${k.id}" value="${esc(k.position||"")}" list="posList" style="width:240px;padding:6px 10px" aria-label="Position"><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="rl-${k.id}"${k.leitung?" checked":""}> Leitung</label><label style="display:flex;gap:6px;align-items:center;font-size:12px" title="Nur diese Person selbst sieht sich noch in der Mitarbeiterliste"><input type="checkbox" id="rv-${k.id}"${k.versteckt?" checked":""}> Für andere ausblenden</label></div>`:
+    `<span class="who">${avOf(k)}<span style="display:flex;flex-direction:column;gap:4px"><span>${esc(k.name)}${k.leitung?' <span class="badge" style="color:var(--l2);margin-left:4px">Leitung</span>':""}${k.versteckt?' <span class="badge" style="margin-left:4px" title="Nur du siehst dich in der Mitarbeiterliste">Ausgeblendet</span>':""}</span><small>Seit ${fmtDate(k.angelegt)}</small>${badgeRow(k.id,3)}</span></span>`}</td>
    ${W?`<td>${ren?`<input class="i mono" id="rp-${k.id}" value="${esc(p)}" inputmode="numeric" style="width:120px;padding:6px 10px" aria-label="Reisepassnummer">`:p?`<span class="tact"><span class="mono">${sh?esc(p):"••••"+esc(p.slice(-4))}</span><button class="btn sm ghost" data-act="pass" data-id="${k.id}">${sh?"Verbergen":"Anzeigen"}</button></span>`:`<span class="hint">–</span>`}</td>
    <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button>${(()=>{const z=(S.zugang||{})[k.id],st=!z||!z.uid?"neu":z.start?"start":"eigen",lb={neu:"Startpasswort erstellen",start:"Startpasswort neu",eigen:"Passwort zurücksetzen"}[st],ti={neu:"Hat noch kein Passwort",start:"Hat das Startpasswort noch nicht geändert",eigen:"Hat ein eigenes Passwort. Zurücksetzen gibt ein neues zufälliges Passwort."}[st];return`<button class="btn sm ghost" data-act="pw-reset" data-id="${k.id}" title="${ti}">${UI.confirmDel==="pw:"+k.id?(st==="neu"?"Wirklich erstellen?":"Wirklich? Altes wird ungültig"):lb}</button>`})()}<button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
   return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
