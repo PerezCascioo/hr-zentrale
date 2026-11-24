@@ -984,7 +984,7 @@ const MEDAL=["#f2c94c","#cfd6e0","#d08b52"];
 let db=null,user=null,assets=null,uid=null,canWrite=true,live=false;
 const S={content:null,konten:[],plaetze:[],wochen:[],log:[],nachweise:[],pruefung:{},feedback:[],geschenke:[]};window.S=S;
 /* Ausgeblendete Mitarbeiter (konten.versteckt) fehlen nur in der Mitarbeiterliste der anderen. Die Person selbst sieht sich dort weiter. */
-const listHidden=k=>!!k.versteckt&&k.id!==meId();
+const listHidden=k=>!!k.versteckt&&k.id!==meId()&&!(UI.showHid&&writable());
 const UI={tab:"ueberblick",edit:{},openSlot:null,showPass:{},confirmDel:null,q:"",lv:"all",st:"farben"};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1813,7 +1813,7 @@ function vKonten(){
    <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button>${(()=>{const z=(S.zugang||{})[k.id],st=!z||!z.uid?"neu":z.start?"start":"eigen",lb={neu:"Startpasswort erstellen",start:"Startpasswort neu",eigen:"Passwort zurücksetzen"}[st],ti={neu:"Hat noch kein Passwort",start:"Hat das Startpasswort noch nicht geändert",eigen:"Hat ein eigenes Passwort. Zurücksetzen gibt ein neues zufälliges Passwort."}[st];return`<button class="btn sm ghost" data-act="pw-reset" data-id="${k.id}" title="${ti}">${UI.confirmDel==="pw:"+k.id?(st==="neu"?"Wirklich erstellen?":"Wirklich? Altes wird ungültig"):lb}</button>`})()}<button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
   return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
   `<div class="card"><div class="toolbar"><input class="i" id="q" type="search" placeholder="Name suchen" value="${esc(UI.q)}" aria-label="Mitarbeiter durchsuchen">
-   <div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
+   ${W&&S.konten.some(k=>k.versteckt&&k.id!==meId())?`<button class="btn sm${UI.showHid?" pri":""}" data-act="show-hid" style="order:3">${UI.showHid?"Ausgeblendete verbergen":"Ausgeblendete anzeigen ("+S.konten.filter(k=>k.versteckt&&k.id!==meId()).length+")"}</button>`:""}<div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
   ${shown.length?`<div class="tbox"><table class="ml" style="min-width:${W?560:0}px"><thead><tr>${W?"<th></th>":""}<th>Mitarbeiter</th>${W?"<th>Reisepass</th><th>Aktionen</th>":""}</tr></thead><tbody>
   ${shown.map(x=>`<tr class="grp"><td colspan="${cols}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(label(x.g))}<span class="gcnt num">${x.list.length}</span></td></tr>${x.list.map((k,j)=>row(k,x.list,j)).join("")}`).join("")}
   </tbody></table></div>`:`<div class="empty" style="border:0">Keine Mitarbeiter gefunden.</div>`}</div>`;
@@ -1948,6 +1948,7 @@ document.addEventListener("click",async e=>{
   if(a==="acc-ren-save"){const k0=konto(id),ld0=!!k0?.leitung,ld1=!!$("#rl-"+id)?.checked;if(k0&&ld0!==ld1)setTimeout(()=>HR.setLeitung&&HR.setLeitung(id,ld1).catch(()=>{}),300)}
   if(a==="acc-ren-save"){const k=konto(id),n=($("#rn-"+id)?.value||"").trim(),pos=($("#rf-"+id)?.value||"").trim(),ld=!!$("#rl-"+id)?.checked;if(!k||!n)return;if(S.konten.some(x=>x.id!==id&&x.name.toLowerCase()===n.toLowerCase())){toast("Diesen Namen gibt es schon.");return}
     if(await write(()=>db.doc("konten/"+id).update({name:n,position:pos,leitung:ld,versteckt:!!$("#rv-"+id)?.checked,pass:($("#rp-"+id)?.value??String(k.pass||"")).trim().slice(0,20)}),`Mitarbeiter ${n} bearbeitet (${pos||"keine Position"}${ld?", Leitung":""})`))toast("Gespeichert");UI.rename=null;render();return}
+  if(a==="show-hid"){UI.showHid=!UI.showHid;render();return}
   if(a==="add-toggle"){UI.addOpen=!UI.addOpen;render();return}
   if(a==="mv"){const all=sortedKonten(),ix=all.findIndex(k=>k.id===id),j=t.dataset.to!==undefined?(t.dataset.to?all.findIndex(k=>k.id===t.dataset.to):-1):ix+i;if(ix<0||j<0||j>=all.length)return;
     const order=all.map(k=>k.id);[order[ix],order[j]]=[order[j],order[ix]];
