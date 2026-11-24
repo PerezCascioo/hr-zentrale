@@ -858,6 +858,7 @@ HR.maStart=async(kid,isLead)=>{const z=await get("zugang/"+kid),v=((z&&z.v)||0)+
   if(z&&z.uid)await F.deleteDoc(F.doc(fs,"leitung/"+z.uid)).catch(()=>{});
   if(isLead)await F.setDoc(F.doc(fs,"leitung/"+cr.user.uid),{kid}).catch(perm);
   return pw};
+HR.leitungBack=async kid=>{const u=auth.currentUser;if(!u)throw{code:"auth/requires-recent-login"};await F.setDoc(F.doc(fs,"leitung/"+u.uid),{kid}).catch(perm)};
 HR.setLeitung=async(kid,on)=>{const z=await get("zugang/"+kid);if(!z||!z.uid)return;if(on)await F.setDoc(F.doc(fs,"leitung/"+z.uid),{kid}).catch(perm);else await F.deleteDoc(F.doc(fs,"leitung/"+z.uid)).catch(perm)};
 HR.maChangePw=async(kid,oldPw,newPw)=>{const u=auth.currentUser;if(!u)throw{code:"auth/requires-recent-login"};
   if(oldPw)await A.reauthenticateWithCredential(u,A.EmailAuthProvider.credential(u.email,oldPw));
@@ -984,7 +985,7 @@ const MEDAL=["#f2c94c","#cfd6e0","#d08b52"];
 let db=null,user=null,assets=null,uid=null,canWrite=true,live=false;
 const S={content:null,konten:[],plaetze:[],wochen:[],log:[],nachweise:[],pruefung:{},feedback:[],geschenke:[]};window.S=S;
 /* Ausgeblendete Mitarbeiter (konten.versteckt) fehlen nur in der Mitarbeiterliste der anderen. Die Person selbst sieht sich dort weiter. */
-const listHidden=k=>!!k.versteckt&&k.id!==meId()&&!(UI.showHid&&writable());
+const listHidden=k=>!!k.versteckt&&k.id!==meId();
 const UI={tab:"ueberblick",edit:{},openSlot:null,showPass:{},confirmDel:null,q:"",lv:"all",st:"farben"};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1036,7 +1037,7 @@ let oldMeDone=false;
 function oldMeCheck(){if(oldMeDone||HR.uid||HR.maLow||!S.konten.length)return;oldMeDone=true;const m=getMe();if(m&&m!=="gast"&&konto(m)){setMe("");setTimeout(()=>{try{openMe();toast("HR Zentral hat jetzt Passwörter. Bitte melde dich neu an.")}catch{}},400)}}
 function applyMe(){if(HR.maLow)setTimeout(pwStartCheck,600);try{oldMeCheck()}catch{}if(HR.uid)return;let k=maId()?konto(maId()):null;const el=$("#meName");UI.me=k?k.name:"";if(el)el.textContent=k?k.name:"Gast";try{applyP()}catch{}setTimeout(()=>syncPic(),800)}
 function openMe(){const b=$("#loginBody");
-  if(HR.maLow){const k=konto(HR.leitKid||maId());b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${esc(k?k.name:"Angemeldet")}</h2><p>Du bist mit deinem eigenen Passwort angemeldet.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>
+  if(HR.maLow){const k=konto(HR.leitKid||maId());b.innerHTML=`<header><div><div class="eyebrow">Dein Konto</div><h2 id="loginT">${esc(k?k.name:"Angemeldet")}</h2><p>Du bist mit deinem eigenen Passwort angemeldet.</p></div><button class="ibtn" data-close-login aria-label="Schließen">×</button></header>${isPerez()?`<button class="btn pri block" data-leit-back style="margin-bottom:10px">Mir die Leitung zurückgeben</button><span class="status" id="lbMsg"></span>`:""}
     <div class="row" style="gap:8px"><button class="btn" data-close-login style="flex:1">Schließen</button><button class="btn danger" data-ma-logout style="flex:1">Abmelden</button></div>`;$("#loginDlg").showModal();return}
   UI.meSel="";UI.zg=null;
   const chips=()=>`<div style="display:flex;gap:8px;flex-wrap:wrap;max-height:46vh;overflow:auto;padding:2px">${sortedKonten().map(k=>`<button type="button" class="btn${k.id===UI.meSel?" pri":""}" data-me-pick="${k.id}" aria-pressed="${k.id===UI.meSel}">${esc(k.name)}</button>`).join("")}</div>`;
@@ -1813,7 +1814,7 @@ function vKonten(){
    <td><span class="tact">${ren?`<button class="btn sm pri" data-act="acc-ren-save" data-id="${k.id}">Speichern</button><button class="btn sm ghost" data-act="acc-ren" data-id="">Abbrechen</button>`:`<button class="btn sm ghost" data-act="acc-ren" data-id="${k.id}">Bearbeiten</button>${(()=>{const z=(S.zugang||{})[k.id],st=!z||!z.uid?"neu":z.start?"start":"eigen",lb={neu:"Startpasswort erstellen",start:"Startpasswort neu",eigen:"Passwort zurücksetzen"}[st],ti={neu:"Hat noch kein Passwort",start:"Hat das Startpasswort noch nicht geändert",eigen:"Hat ein eigenes Passwort. Zurücksetzen gibt ein neues zufälliges Passwort."}[st];return`<button class="btn sm ghost" data-act="pw-reset" data-id="${k.id}" title="${ti}">${UI.confirmDel==="pw:"+k.id?(st==="neu"?"Wirklich erstellen?":"Wirklich? Altes wird ungültig"):lb}</button>`})()}<button class="btn sm danger" data-act="acc-del" data-id="${k.id}">${UI.confirmDel===k.id?"Sicher?":"Entfernen"}</button>`}</span></td>`:""}</tr>`};
   return page("konten","Mitarbeiterliste",`${all.length} Mitarbeiter, davon ${nLead} in der Leitung. Sortiert nach Rang.${W?" Mit ▲ ▼ änderst du die Reihenfolge innerhalb eines Rangs.":""}`,addBtn)+form+dl+
   `<div class="card"><div class="toolbar"><input class="i" id="q" type="search" placeholder="Name suchen" value="${esc(UI.q)}" aria-label="Mitarbeiter durchsuchen">
-   ${W&&S.konten.some(k=>k.versteckt&&k.id!==meId())?`<button class="btn sm${UI.showHid?" pri":""}" data-act="show-hid" style="order:3">${UI.showHid?"Ausgeblendete verbergen":"Ausgeblendete anzeigen ("+S.konten.filter(k=>k.versteckt&&k.id!==meId()).length+")"}</button>`:""}<div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
+   <div class="fchips"><button class="fchip" data-lv="all" aria-pressed="${f==="all"}">Alle <span class="num">${all.length}</span></button>${groups.map(x=>`<button class="fchip" data-lv="${esc(x.g)}" aria-pressed="${f===x.g}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(short(x.g))} <span class="num">${x.list.length}</span></button>`).join("")}</div></div>
   ${shown.length?`<div class="tbox"><table class="ml" style="min-width:${W?560:0}px"><thead><tr>${W?"<th></th>":""}<th>Mitarbeiter</th>${W?"<th>Reisepass</th><th>Aktionen</th>":""}</tr></thead><tbody>
   ${shown.map(x=>`<tr class="grp"><td colspan="${cols}"><span class="gdot" style="background:${color(x.g)}"></span>${esc(label(x.g))}<span class="gcnt num">${x.list.length}</span></td></tr>${x.list.map((k,j)=>row(k,x.list,j)).join("")}`).join("")}
   </tbody></table></div>`:`<div class="empty" style="border:0">Keine Mitarbeiter gefunden.</div>`}</div>`;
@@ -1948,7 +1949,6 @@ document.addEventListener("click",async e=>{
   if(a==="acc-ren-save"){const k0=konto(id),ld0=!!k0?.leitung,ld1=!!$("#rl-"+id)?.checked;if(k0&&ld0!==ld1)setTimeout(()=>HR.setLeitung&&HR.setLeitung(id,ld1).catch(()=>{}),300)}
   if(a==="acc-ren-save"){const k=konto(id),n=($("#rn-"+id)?.value||"").trim(),pos=($("#rf-"+id)?.value||"").trim(),ld=!!$("#rl-"+id)?.checked;if(!k||!n)return;if(S.konten.some(x=>x.id!==id&&x.name.toLowerCase()===n.toLowerCase())){toast("Diesen Namen gibt es schon.");return}
     if(await write(()=>db.doc("konten/"+id).update({name:n,position:pos,leitung:ld,versteckt:!!$("#rv-"+id)?.checked,pass:($("#rp-"+id)?.value??String(k.pass||"")).trim().slice(0,20)}),`Mitarbeiter ${n} bearbeitet (${pos||"keine Position"}${ld?", Leitung":""})`))toast("Gespeichert");UI.rename=null;render();return}
-  if(a==="show-hid"){UI.showHid=!UI.showHid;render();return}
   if(a==="add-toggle"){UI.addOpen=!UI.addOpen;render();return}
   if(a==="mv"){const all=sortedKonten(),ix=all.findIndex(k=>k.id===id),j=t.dataset.to!==undefined?(t.dataset.to?all.findIndex(k=>k.id===t.dataset.to):-1):ix+i;if(ix<0||j<0||j>=all.length)return;
     const order=all.map(k=>k.id);[order[ix],order[j]]=[order[j],order[ix]];
@@ -2311,6 +2311,9 @@ $("#loginDlg").addEventListener("click",async e=>{
     $("#lgMsg").textContent="Lege dein Passwort fest …";try{await HR.maSetup(UI.meSel,p1)}catch(er){$("#lgMsg").textContent=authErr(er)}return}
   if(e.target.closest("[data-me-shared]")){UI.zg=false;$("#meFoot").innerHTML=meFoot();setTimeout(()=>$("#meP")?.focus(),30);return}
   if(e.target.closest("[data-ma-logout]")){await HR.logout();return}
+  if(e.target.closest("[data-leit-back]")){const id=meId(),m=$("#lbMsg");if(!isPerez()||!id)return;if(m)m.textContent="Einen Moment …";
+    try{await HR.leitungBack(id);try{await db.doc("konten/"+id).update({leitung:true})}catch{}if(m)m.textContent="Erledigt, die Seite lädt neu.";setTimeout(()=>location.reload(),800)}
+    catch(er){if(m)m.textContent="Hat nicht geklappt. Sind die neuen Firebase-Regeln schon eingefügt?"}return}
   if(e.target.closest("[data-pw-change]")){openPwChange(false);return}
   if(e.target.closest("[data-pw-save]")){const o=$("#pwOld")?.value||"",p1=$("#pwN1").value,p2=$("#pwN2").value;if(p1.length<6){$("#lgMsg").textContent="Das Passwort braucht mindestens 6 Zeichen.";return}if(p1!==p2){$("#lgMsg").textContent="Die Passwörter sind nicht gleich.";return}
     if($("#pwOld")&&!o){$("#lgMsg").textContent="Gib dein aktuelles Passwort ein.";return}$("#lgMsg").textContent="Speichere …";

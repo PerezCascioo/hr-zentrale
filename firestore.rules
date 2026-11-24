@@ -43,6 +43,13 @@ service cloud.firestore {
     match /leitung/{luid} {
       allow read: if request.auth != null && (request.auth.uid == luid || isLeitung());
       allow write: if isLeitung();
+      // Perez Cascio darf sich die Leitung selbst zurückgeben (nur mit seinem eigenen Login)
+      allow create: if request.auth != null && request.auth.uid == luid
+        && request.resource.data.keys().hasOnly(['kid'])
+        && request.resource.data.kid is string
+        && exists(zugangDoc(request.resource.data.kid))
+        && get(zugangDoc(request.resource.data.kid)).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/konten/$(request.resource.data.kid)).data.name == 'Perez Cascio';
     }
 
     match /meta/owner {
